@@ -1,0 +1,26 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose       # check HTTP response body is closed
+    - nilerr          # return nil despite checking err != nil
+    - nilnesserr      # check err != nil but return different nil value
+    - nilnil          # return nil err + nil value simultaneously
+  settings:
+    govet:
+      enable:
+        - fieldalignment
+        - shadow
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Chandra179/lux
+
+run:
+  timeout: 5m

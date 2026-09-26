@@ -1,0 +1,56 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      SQLITE_DSN: lux.db
+      BADGER_DIR: lux
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix web
+
+      - name: Frontend lint
+        run: npm run lint --prefix web
+
+      - name: Frontend typecheck
+        run: npm run typecheck --prefix web
+
+      - name: Frontend build
+        run: npm run build --prefix web
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2
+
+      - name: Test
+        run: go test -short -race -count=1 ./...
+
+      - name: Migrate
+        run: go run github.com/pressly/goose/v3/cmd/goose@latest -dir server/store/migrations/sqlite sqlite3 "$SQLITE_DSN" up
+
+      - name: Build
+        run: go build ./...
+
+      - name: Podman build
+        run: podman build .

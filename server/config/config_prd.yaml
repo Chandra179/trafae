@@ -1,0 +1,24 @@
+http:
+  port: "8080"
+  read_timeout_in_second: 5
+  write_timeout_in_second: 120
+  idle_timeout_in_second: 120
+  shutdown_timeout_in_second: 30
+  max_body_size_in_bytes: 1048576
+
+logger:
+  level: info
+  sampling_initial: 100
+  sampling_thereafter: 100
+
+middleware:
+  request_log:
+    skip_paths: ["/health"]
+    log_query: false
+    query_allowlist: []
+
+sqlite:
+  dsn: ""
+
+badger:
+  dir: ""

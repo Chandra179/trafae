@@ -1,0 +1,25 @@
+# Go binaries and build output
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test and coverage output
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go dependency and workspace files
+vendor/
+go.work
+go.work.sum
+
+# Local environment and server runtime data
+.env
+*.db
+*.db-*
+lux/
+badger/

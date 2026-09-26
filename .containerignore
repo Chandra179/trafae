@@ -1,0 +1,13 @@
+.git
+.github
+.codex
+.agents
+bin
+client
+web
+docs
+*.db
+*.db-*
+lux
+badger
+.env

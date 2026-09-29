@@ -11,6 +11,8 @@ type dependencies struct {
 	requestBodyLimit gin.HandlerFunc
 	readiness        gin.HandlerFunc
 	example          gin.HandlerFunc
+	bookSearch       gin.HandlerFunc
+	bookProviders    gin.HandlerFunc
 }
 
 type DependenciesConfig struct {
@@ -19,6 +21,8 @@ type DependenciesConfig struct {
 	RequestBodyLimit gin.HandlerFunc
 	Readiness        gin.HandlerFunc
 	Example          gin.HandlerFunc
+	BookSearch       gin.HandlerFunc
+	BookProviders    gin.HandlerFunc
 }
 
 func NewDependencies(deps *DependenciesConfig) *dependencies {
@@ -28,5 +32,7 @@ func NewDependencies(deps *DependenciesConfig) *dependencies {
 		requestBodyLimit: deps.RequestBodyLimit,
 		readiness:        deps.Readiness,
 		example:          deps.Example,
+		bookSearch:       deps.BookSearch,
+		bookProviders:    deps.BookProviders,
 	}
 }

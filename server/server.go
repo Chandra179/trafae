@@ -16,7 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Chandra179/lux/server/config"
+	"github.com/Chandra179/lux/server/internal/books"
 	"github.com/Chandra179/lux/server/internal/example"
+	"github.com/Chandra179/lux/server/internal/providers"
 	"github.com/Chandra179/lux/server/logger"
 	"github.com/Chandra179/lux/server/middleware"
 	"github.com/Chandra179/lux/server/router"
@@ -55,6 +57,9 @@ func runHTTPServer() error {
 	}
 	defer func() { _ = log.Sync() }()
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	db, err := store.NewSQLite(context.Background(), cfg.SQLite.DSN)
 	if err != nil {
 		return err
@@ -71,6 +76,26 @@ func runHTTPServer() error {
 		Logger: log,
 		DB:     db,
 	})
+	providerDeps := providers.NewDependencies(&providers.DependenciesConfig{
+		Logger:              log,
+		DB:                  db,
+		HTTPClient:          &http.Client{Timeout: seconds(cfg.Providers.HTTPTimeoutInSec)},
+		OpenLibraryEmail:    cfg.Providers.OpenLibraryContactEmail,
+		GutenbergCatalogURL: cfg.Providers.GutenbergCatalogURL,
+	})
+	providerDeps.Start(ctx)
+	searchTimeouts := make(map[string]time.Duration, len(cfg.Providers.SearchTimeoutsInSec))
+	for id, timeoutInSec := range cfg.Providers.SearchTimeoutsInSec {
+		searchTimeouts[id] = seconds(timeoutInSec)
+	}
+	booksDeps := books.NewDependencies(&books.DependenciesConfig{
+		Logger:         log,
+		Providers:      providerDeps.All(),
+		DefaultGenre:   cfg.Books.DefaultGenre,
+		DefaultLimit:   cfg.Books.DefaultLimit,
+		SearchTimeout:  seconds(cfg.Providers.SearchTimeoutInSec),
+		SearchTimeouts: searchTimeouts,
+	})
 	middlewareDeps := middleware.NewDependencies(log)
 
 	engine := router.NewDependencies(&router.DependenciesConfig{
@@ -79,6 +104,8 @@ func runHTTPServer() error {
 		RequestBodyLimit: middleware.RequestBodyLimit(cfg.HTTP.MaxBodySizeInBytes),
 		Readiness:        readinessHandler(db, badgerDB),
 		Example:          exampleDeps.HandleExample,
+		BookSearch:       booksDeps.HandleSearch,
+		BookProviders:    booksDeps.HandleProviders,
 	}).New()
 
 	httpServer := &http.Server{
@@ -88,9 +115,6 @@ func runHTTPServer() error {
 		WriteTimeout: seconds(cfg.HTTP.WriteTimeoutInSec),
 		IdleTimeout:  seconds(cfg.HTTP.IdleTimeoutInSec),
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	serverErr := make(chan error, 1)
 	go func() {

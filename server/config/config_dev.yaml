@@ -15,10 +15,28 @@ middleware:
   request_log:
     skip_paths: ["/health"]
     log_query: true
-    query_allowlist: ["page", "limit", "cursor"]
+    query_allowlist: ["topic", "genre", "provider", "min_year", "max_year", "language", "min_popularity", "min_rating", "limit"]
 
 sqlite:
   dsn: "lux.db"
 
 badger:
   dir: "lux"
+
+books:
+  default_genre: "non-fiction"
+  default_limit: 20
+
+providers:
+  http_timeout_in_second: 18
+  open_library_contact_email: ""
+  gutenberg_catalog_url: "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"
+  search_timeout_in_second: 30
+  search_timeouts_in_second:
+    open_library: 20
+    doab: 15
+    gutendex: 25
+    internet_archive: 25
+    library_of_congress: 20
+    wikidata: 30
+    project_gutenberg: 10

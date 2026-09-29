@@ -3,9 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/Chandra179/lux/server/internal/books"
 )
 
 type Config struct {
@@ -14,6 +17,21 @@ type Config struct {
 	Badger     BadgerConfig     `yaml:"badger"`
 	Middleware MiddlewareConfig `yaml:"middleware"`
 	HTTP       HTTPConfig       `yaml:"http"`
+	Books      BooksConfig      `yaml:"books"`
+	Providers  ProvidersConfig  `yaml:"providers"`
+}
+
+type BooksConfig struct {
+	DefaultGenre string `yaml:"default_genre"`
+	DefaultLimit int    `yaml:"default_limit"`
+}
+
+type ProvidersConfig struct {
+	HTTPTimeoutInSec        int            `yaml:"http_timeout_in_second"`
+	OpenLibraryContactEmail string         `yaml:"open_library_contact_email"`
+	GutenbergCatalogURL     string         `yaml:"gutenberg_catalog_url"`
+	SearchTimeoutInSec      int            `yaml:"search_timeout_in_second"`
+	SearchTimeoutsInSec     map[string]int `yaml:"search_timeouts_in_second"`
 }
 
 type HTTPConfig struct {
@@ -62,6 +80,26 @@ func Load(path string) (*Config, error) {
 	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(cfg.Books.DefaultGenre) == "" {
+		cfg.Books.DefaultGenre = books.DefaultGenre
+	}
+	if cfg.Books.DefaultLimit == 0 {
+		cfg.Books.DefaultLimit = books.DefaultResultLimit
+	}
+	if cfg.Providers.HTTPTimeoutInSec == 0 {
+		cfg.Providers.HTTPTimeoutInSec = 18
+	}
+	if strings.TrimSpace(cfg.Providers.GutenbergCatalogURL) == "" {
+		cfg.Providers.GutenbergCatalogURL = "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"
+	}
+	if cfg.Providers.SearchTimeoutInSec == 0 {
+		cfg.Providers.SearchTimeoutInSec = int(books.DefaultSearchTimeout.Seconds())
+	}
+	timeouts := make(map[string]int, len(cfg.Providers.SearchTimeoutsInSec))
+	for id, timeout := range cfg.Providers.SearchTimeoutsInSec {
+		timeouts[strings.ToLower(strings.TrimSpace(id))] = timeout
+	}
+	cfg.Providers.SearchTimeoutsInSec = timeouts
 
 	if dsn, ok := os.LookupEnv("SQLITE_DSN"); ok {
 		cfg.SQLite.DSN = dsn
@@ -101,6 +139,31 @@ func (c Config) Validate() error {
 	}
 	if c.HTTP.MaxBodySizeInBytes <= 0 {
 		problems = append(problems, "http.max_body_size_in_bytes must be greater than zero")
+	}
+	if c.Books.DefaultGenre == "" {
+		problems = append(problems, "books.default_genre is required")
+	}
+	if c.Books.DefaultLimit <= 0 || c.Books.DefaultLimit > 50 {
+		problems = append(problems, "books.default_limit must be between 1 and 50")
+	}
+	if c.Providers.HTTPTimeoutInSec <= 0 {
+		problems = append(problems, "providers.http_timeout_in_second must be greater than zero")
+	}
+	if c.Providers.SearchTimeoutInSec <= 0 {
+		problems = append(problems, "providers.search_timeout_in_second must be greater than zero")
+	}
+	providerIDs := make([]string, 0, len(c.Providers.SearchTimeoutsInSec))
+	for id := range c.Providers.SearchTimeoutsInSec {
+		providerIDs = append(providerIDs, id)
+	}
+	sort.Strings(providerIDs)
+	for _, id := range providerIDs {
+		if c.Providers.SearchTimeoutsInSec[id] <= 0 {
+			problems = append(problems, fmt.Sprintf("providers.search_timeouts_in_second.%s must be greater than zero", id))
+		}
+	}
+	if strings.TrimSpace(c.Providers.GutenbergCatalogURL) == "" {
+		problems = append(problems, "providers.gutenberg_catalog_url is required")
 	}
 
 	level := strings.ToLower(strings.TrimSpace(c.Logger.Level))

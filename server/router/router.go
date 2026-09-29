@@ -54,6 +54,12 @@ func (d *dependencies) New() *gin.Engine {
 	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.POST("/example", d.example)
+	if d.bookSearch != nil {
+		r.GET("/books/search", d.bookSearch)
+	}
+	if d.bookProviders != nil {
+		r.GET("/books/providers", d.bookProviders)
+	}
 
 	return r
 }

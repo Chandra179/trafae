@@ -4,6 +4,10 @@ Lux is a book discovery service: it searches multiple open book catalogs at
 once, deduplicates the results, and fuses them into a single ranked list. It
 contains a Go API server and a React frontend.
 
+## App preview
+
+![Lux searching "psychology" across open book catalogs: search, genre chips, provider status and fused results](docs/images/app-preview.png)
+
 ### Book search
 
 `GET /books/search` fans a query out to every configured provider in parallel

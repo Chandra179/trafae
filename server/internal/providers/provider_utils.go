@@ -220,6 +220,10 @@ func safeNextURL(base, next string) string {
 	return nextURL.String()
 }
 
+func escapeQuery(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(strings.TrimSpace(value))
+}
+
 func gutendexLanguage(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	for _, pair := range [][2]string{{"english", "en"}, {"eng", "en"}, {"french", "fr"}, {"fre", "fr"}, {"fra", "fr"}, {"german", "de"}, {"ger", "de"}, {"deu", "de"}, {"spanish", "es"}, {"spa", "es"}, {"italian", "it"}, {"ita", "it"}, {"portuguese", "pt"}, {"por", "pt"}} {

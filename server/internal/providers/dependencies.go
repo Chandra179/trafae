@@ -42,7 +42,7 @@ func NewDependencies(cfg *DependenciesConfig) *dependencies {
 	}
 	client := defaultClient(cfg.HTTPClient)
 	openLibrary := newOpenLibraryProvider(client, baseOr(cfg.OpenLibraryBaseURL, "https://openlibrary.org"), cfg.OpenLibraryEmail)
-	doab := newDOABProvider(client, baseOr(cfg.DOABBaseURL, "https://directory.doabooks.org/rest/search"))
+	doab := newDOABProvider(client, baseOr(cfg.DOABBaseURL, "https://directory.doabooks.org/rest/api/discover/search/objects"))
 	gutendex := newGutendexProvider(client, baseOr(cfg.GutendexBaseURL, "https://gutendex.com/books"))
 	internetArchive := newInternetArchiveProvider(client, baseOr(cfg.InternetArchiveBaseURL, "https://archive.org/advancedsearch.php"))
 	loc := newLibraryOfCongressProvider(client, baseOr(cfg.LibraryOfCongressBaseURL, "https://www.loc.gov/books/"))
@@ -50,7 +50,7 @@ func NewDependencies(cfg *DependenciesConfig) *dependencies {
 	if cfg.DB != nil {
 		pg = newProjectGutenbergProvider(cfg.DB, client, baseOr(cfg.GutenbergCatalogURL, "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"))
 	}
-	wikidata := newWikidataProvider(client, baseOr(cfg.WikidataBaseURL, "https://query.wikidata.org/sparql"))
+	wikidata := newWikidataProvider(client, baseOr(cfg.WikidataBaseURL, "https://www.wikidata.org/w/api.php"))
 	providers := []books.Provider{openLibrary, doab, gutendex, internetArchive, loc, wikidata}
 	if pg != nil {
 		providers = append(providers, pg)

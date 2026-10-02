@@ -39,8 +39,9 @@ func (p *gutendexProvider) Search(ctx context.Context, request books.SearchReque
 			values.Set("languages", gutendexLanguage(request.Language))
 		}
 		pageURL := p.endpoint + "?" + values.Encode()
-		maxPages := 3
-		for page := 0; page < maxPages && len(found.items) < withLimit(request, 100); page++ {
+		target := withLimit(request, 200)
+		maxPages := 8
+		for page := 0; page < maxPages && len(found.items) < target; page++ {
 			var response struct {
 				Next    string `json:"next"`
 				Results []struct {

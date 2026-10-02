@@ -69,7 +69,7 @@ func (p *projectGutenbergProvider) Search(ctx context.Context, request books.Sea
 		args = append(args, "%"+strings.ToLower(request.Language)+"%")
 	}
 	query += " ORDER BY downloads DESC, title COLLATE NOCASE LIMIT ?"
-	args = append(args, withLimit(request, 100))
+	args = append(args, withLimit(request, 200))
 	rows, err := p.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query Project Gutenberg catalog: %w", err)

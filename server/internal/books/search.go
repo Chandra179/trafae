@@ -29,10 +29,21 @@ func (d *dependencies) Capabilities() []ProviderCapability {
 
 func (d *dependencies) Search(ctx context.Context, request SearchRequest) (SearchResponse, error) {
 	request = d.normalizeRequest(request)
-	response := SearchResponse{Results: []SearchResult{}, Providers: []ProviderStatus{}, Limit: request.Limit}
+	response := SearchResponse{Results: []SearchResult{}, Providers: []ProviderStatus{}, Limit: request.Limit, Page: request.Page}
 	selected := d.selectedProviders(request.Providers)
 	if len(selected) == 0 {
 		return response, errors.New("no configured providers matched the request")
+	}
+
+	// Providers fetch enough for every page up to the requested one so page N
+	// can be served by fusing each provider's top results and slicing; see the
+	// slice at the end of Search.
+	fetchRequest := request
+	fetchRequest.Limit = request.Page * request.Limit
+	// Genre-only browse: keyword-search the genre so every provider can
+	// contribute, instead of post-filtering each provider's default batch.
+	if len(fetchRequest.Topics) == 0 && !strings.EqualFold(request.Genre, DefaultGenre) {
+		fetchRequest.Topics = []string{request.Genre}
 	}
 
 	type providerResult struct {
@@ -55,7 +66,7 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 			defer wg.Done()
 			providerCtx, cancel := context.WithTimeout(ctx, d.searchTimeoutFor(capability.ID))
 			defer cancel()
-			books, err := provider.Search(providerCtx, request)
+			books, err := provider.Search(providerCtx, fetchRequest)
 			results <- providerResult{capability: capability, books: books, err: err}
 		}()
 	}
@@ -118,10 +129,16 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 		}
 		return strings.ToLower(ordered[i].Book.Title) < strings.ToLower(ordered[j].Book.Title)
 	})
-	if len(ordered) > request.Limit {
-		ordered = ordered[:request.Limit]
+	start := (request.Page - 1) * request.Limit
+	if start > len(ordered) {
+		start = len(ordered)
 	}
-	response.Results = ordered
+	end := start + request.Limit
+	if end > len(ordered) {
+		end = len(ordered)
+	}
+	response.HasMore = end < len(ordered)
+	response.Results = ordered[start:end]
 	return response, nil
 }
 
@@ -163,6 +180,12 @@ func (d *dependencies) normalizeRequest(request SearchRequest) SearchRequest {
 	}
 	if request.Limit > MaxResultLimit {
 		request.Limit = MaxResultLimit
+	}
+	if request.Page <= 0 {
+		request.Page = 1
+	}
+	if request.Page > MaxSearchPage {
+		request.Page = MaxSearchPage
 	}
 	request.Language = strings.ToLower(strings.TrimSpace(request.Language))
 	for i := range request.Topics {

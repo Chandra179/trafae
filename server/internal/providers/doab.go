@@ -2,7 +2,7 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,47 +20,60 @@ func newDOABProvider(client *http.Client, endpoint string) *doabProvider {
 }
 
 func (p *doabProvider) Capabilities() books.ProviderCapability {
-	return books.ProviderCapability{ID: "doab", Name: "DOAB", Filters: []string{books.FilterTopics, books.FilterGenre, books.FilterYear, books.FilterLanguage}, Notes: []string{"DOAB catalogs scholarly open-access books; popularity and reader ratings are not provided."}}
+	return books.ProviderCapability{ID: "doab", Name: "DOAB", Filters: []string{books.FilterTopics, books.FilterGenre, books.FilterYear, books.FilterLanguage}, Notes: []string{"DOAB catalogs scholarly open-access books; links go to the DOAB record where the PDF can be downloaded."}}
 }
 
 func (p *doabProvider) Search(ctx context.Context, request books.SearchRequest) ([]books.Book, error) {
 	terms := queryTerms(request)
 	if len(terms) == 0 {
-		terms = []string{"*:*"}
+		terms = []string{""}
 	}
 	var found bookAccumulator
 	for _, term := range terms {
 		values := url.Values{}
-		if term == "*:*" {
+		if term != "" {
 			values.Set("query", term)
-		} else {
-			values.Set("query", `dc.subject:"`+escapeQuery(term)+`"`)
 		}
-		values.Set("expand", "metadata,bitstreams")
-		var response json.RawMessage
+		values.Set("size", fmt.Sprint(withLimit(request, 100)))
+		values.Set("page", "0")
+		var response struct {
+			Embedded struct {
+				SearchResult struct {
+					Embedded struct {
+						Objects []struct {
+							Embedded struct {
+								IndexableObject struct {
+									UUID     string             `json:"uuid"`
+									Handle   string             `json:"handle"`
+									Name     string             `json:"name"`
+									Metadata doabMetadataValues `json:"metadata"`
+								} `json:"indexableObject"`
+							} `json:"_embedded"`
+						} `json:"objects"`
+					} `json:"_embedded"`
+				} `json:"searchResult"`
+			} `json:"_embedded"`
+		}
 		if err := requestJSON(ctx, p.client, p.endpoint, values, "TrafaeBookDiscovery/1.0", &response); err != nil {
 			return nil, err
 		}
-		for _, item := range findMaps(response) {
-			metadata := extractMetadata(item)
-			title := firstString(metadataValue(metadata, "dc.title"), metadataValue(metadata, "title"), stringValue(item["name"]))
+		for _, object := range response.Embedded.SearchResult.Embedded.Objects {
+			item := object.Embedded.IndexableObject
+			metadata := item.Metadata.normalized()
+			title := firstString(metadata.first("dc.title"), item.Name)
 			if title == "" {
 				continue
 			}
-			id := firstString(stringValue(item["handle"]), stringValue(item["uuid"]), stringValue(item["id"]))
-			subjects := metadataValues(metadata, "dc.subject")
-			book := books.Book{ID: id, Title: title, Authors: metadataValues(metadata, "dc.contributor.author", "dc.creator"),
-				Description: metadataValue(metadata, "dc.description"), Subjects: subjects, Genres: append([]string{"non-fiction"}, subjects...),
-				Languages: metadataValues(metadata, "dc.language.iso", "dc.language"), ISBNs: metadataValues(metadata, "dc.identifier.isbn"),
-				License: firstString(metadataValue(metadata, "dc.rights.uri"), metadataValue(metadata, "dc.rights"))}
-			book.Year = parseYear(metadataValue(metadata, "dc.date.issued"))
+			id := firstString(item.UUID, item.Handle)
+			subjects := metadata.all("dc.subject")
+			book := books.Book{ID: id, Title: title, Authors: metadata.all("dc.contributor.author", "dc.creator"),
+				Description: metadata.first("dc.description.abstract", "dc.description"), Subjects: subjects,
+				Genres:    append([]string{"non-fiction"}, subjects...),
+				Languages: metadata.all("dc.language.iso", "dc.language"), ISBNs: metadata.all("dc.identifier.isbn"),
+				License: firstString(metadata.first("dc.rights.uri"), metadata.first("dc.rights"), "Open Access")}
+			book.Year = parseYear(metadata.first("dc.date.issued"))
 			book.YearKind = "publication_year"
-			if id != "" && strings.Contains(id, "/") {
-				book.URL = "https://directory.doabooks.org/handle/" + id
-			}
-			if book.URL == "" {
-				book.URL = firstString(stringValue(item["link"]), stringValue(item["url"]))
-			}
+			book.URL = firstString(metadata.first("dc.identifier.uri"), doabHandleURL(item.Handle), doabItemURL(item.UUID))
 			book.Source = books.BookSource{Provider: "doab", ID: id, URL: book.URL}
 			found.add(book)
 		}
@@ -68,73 +81,55 @@ func (p *doabProvider) Search(ctx context.Context, request books.SearchRequest) 
 	return found.all(), nil
 }
 
-func escapeQuery(value string) string {
-	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(strings.TrimSpace(value))
+func doabHandleURL(handle string) string {
+	if handle == "" {
+		return ""
+	}
+	return "https://directory.doabooks.org/handle/" + handle
 }
 
-func findMaps(raw json.RawMessage) []map[string]any {
-	var value any
-	if json.Unmarshal(raw, &value) != nil {
-		return nil
+func doabItemURL(uuid string) string {
+	if uuid == "" {
+		return ""
 	}
-	var output []map[string]any
-	var walk func(any)
-	walk = func(value any) {
-		switch v := value.(type) {
-		case []any:
-			for _, child := range v {
-				walk(child)
-			}
-		case map[string]any:
-			if _, hasMetadata := v["metadata"]; hasMetadata {
-				output = append(output, v)
-			}
-			for _, child := range v {
-				walk(child)
-			}
-		}
-	}
-	walk(value)
-	return output
+	return "https://directory.doabooks.org/items/" + uuid
 }
 
-func extractMetadata(item map[string]any) map[string][]string {
-	metadata := map[string][]string{}
-	var walk func(any)
-	walk = func(value any) {
-		switch v := value.(type) {
-		case []any:
-			for _, child := range v {
-				walk(child)
-			}
-		case map[string]any:
-			if key, ok := v["key"].(string); ok {
-				if val, ok := v["value"].(string); ok {
-					metadata[key] = append(metadata[key], val)
-				}
-			}
-			for _, child := range v {
-				walk(child)
-			}
+type doabMetadataValues map[string][]doabMetadataValue
+
+type doabMetadataValue struct {
+	Value string `json:"value"`
+}
+
+func (raw doabMetadataValues) normalized() doabMetadata {
+	metadata := make(doabMetadata, len(raw))
+	for key, values := range raw {
+		parsed := make([]string, 0, len(values))
+		for _, value := range values {
+			parsed = append(parsed, value.Value)
 		}
+		metadata[key] = parsed
 	}
-	walk(item["metadata"])
 	return metadata
 }
 
-func metadataValues(metadata map[string][]string, keys ...string) []string {
+type doabMetadata map[string][]string
+
+func (m doabMetadata) first(keys ...string) string {
+	for _, key := range keys {
+		if values := m[key]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+			return strings.TrimSpace(values[0])
+		}
+	}
+	return ""
+}
+
+func (m doabMetadata) all(keys ...string) []string {
 	values := []string{}
 	for _, key := range keys {
-		for _, value := range metadata[key] {
+		for _, value := range m[key] {
 			values = addUnique(values, value)
 		}
 	}
 	return values
-}
-
-func metadataValue(metadata map[string][]string, key string) string {
-	if values := metadata[key]; len(values) > 0 {
-		return values[0]
-	}
-	return ""
 }

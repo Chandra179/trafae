@@ -9,26 +9,47 @@ contains a Go API server and a React frontend.
 `GET /books/search` fans a query out to every configured provider in parallel
 and merges the responses with Reciprocal Rank Fusion. Duplicate books across
 providers are collapsed into one result that keeps the per-source metrics.
+Every parameter is optional: search by topic (`topic`, repeatable), browse by
+`genre` alone (the genre doubles as the search term across providers when no
+topic is given), or combine both with the filters below.
+
+Paging is stateless: pass `page` (1-based, default 1) alongside `limit` (page
+size). Each request re-fetches enough from every provider to serve page N and
+slices the fused ranking, so ordering stays stable across pages; the response
+reports `page` and `has_more`.
+
+| Query param | Meaning |
+|-------------|---------|
+| `topic` | search term, repeatable (max 8); optional |
+| `genre` | genre filter; defaults to `default_genre`, works standalone |
+| `page` | 1-based page number (max 20) |
+| `limit` | page size (default 20, max 50) |
+| `provider` | restrict to specific providers, repeatable |
+| `language` | two-letter language filter |
+| `min_year` / `max_year` | publication year range |
+| `min_popularity` | provider-specific popularity (e.g. downloads) |
+| `min_rating` | 0–5 rating floor |
 
 Supported providers:
 
 | Provider | Popularity | Ratings | Notes |
 |----------|------------|---------|-------|
 | Open Library | — | 0–5 | Rate limited; set `open_library_contact_email` for higher limits |
-| DOAB | — | — | Scholarly open-access books |
+| DOAB | — | — | Scholarly open-access books via the DSpace 7 API; links go to the DOAB record |
 | Gutendex | Downloads | — | Project Gutenberg via Gutendex |
 | Internet Archive | Downloads | 0–5 | |
 | Library of Congress | — | — | Digital collections |
-| Wikidata | — | — | Community-supplied metadata |
+| Wikidata | — | — | Community-supplied metadata via the Wikidata Action API |
 | Project Gutenberg | Downloads | — | Official catalog synced daily into SQLite |
 
 `GET /books/providers` lists each provider with the filters it supports, so
 clients can adapt queries to what will actually be served.
 
-Example:
+Examples:
 
 ```bash
 curl "http://localhost:8080/books/search?topic=biology&genre=non-fiction&min_rating=4&limit=10"
+curl "http://localhost:8080/books/search?genre=history&page=2&limit=24"
 ```
 
 ### Backend

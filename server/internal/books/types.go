@@ -17,6 +17,7 @@ const (
 	DefaultResultLimit = 20
 	MaxResultLimit     = 50
 	MaxSearchTopics    = 8
+	MaxSearchPage      = 20
 	// DefaultSearchTimeout bounds each provider call when the wiring does not
 	// supply providers.search_timeout_in_second.
 	DefaultSearchTimeout = 30 * time.Second
@@ -33,6 +34,7 @@ type SearchRequest struct {
 	MinPopularity *float64
 	MinRating     *float64
 	Limit         int
+	Page          int
 }
 
 // ProviderCapability describes data and filters a provider can honor.
@@ -107,6 +109,8 @@ type SearchResponse struct {
 	Results   []SearchResult   `json:"results"`
 	Providers []ProviderStatus `json:"providers"`
 	Limit     int              `json:"limit"`
+	Page      int              `json:"page"`
+	HasMore   bool             `json:"has_more"`
 }
 
 func (r SearchRequest) RequiredFilters() []string {

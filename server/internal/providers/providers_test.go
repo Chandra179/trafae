@@ -74,18 +74,21 @@ func TestGutendexSearchMapsTopicsAndDownloads(t *testing.T) {
 
 func TestDOABSearchMapsMetadata(t *testing.T) {
 	client := fakeClient(t, func(r *http.Request) string {
-		if r.URL.Query().Get("query") == "" || r.URL.Query().Get("expand") != "metadata,bitstreams" {
+		if !strings.Contains(r.URL.Query().Get("query"), "biology") || r.URL.Query().Get("page") != "0" || r.URL.Query().Get("size") == "" {
 			t.Errorf("unexpected query: %s", r.URL.String())
 		}
-		return `{"items":[{"uuid":"uuid-1","handle":"20.500/123","metadata":[{"key":"dc.title","value":"Open Biology"},{"key":"dc.contributor.author","value":"Ada Author"},{"key":"dc.subject","value":"Biology"},{"key":"dc.date.issued","value":"2020"},{"key":"dc.language.iso","value":"en"},{"key":"dc.rights.uri","value":"https://creativecommons.org/licenses/by/4.0/"}]}]}`
+		return `{"_embedded":{"searchResult":{"_embedded":{"objects":[{"_embedded":{"indexableObject":{"uuid":"uuid-1","handle":"20.500.12071/123","name":"Open Biology","metadata":{"dc.title":[{"value":"Open Biology"}],"dc.contributor.author":[{"value":"Ada Author"}],"dc.subject":[{"value":"Biology"}],"dc.date.issued":[{"value":"2020"}],"dc.language.iso":[{"value":"en"}],"dc.rights.uri":[{"value":"https://creativecommons.org/licenses/by/4.0/"}],"dc.identifier.uri":[{"value":"https://directory.doabooks.org/handle/20.500.12071/123"}]}}}}]}}}}`
 	})
-	provider := newDOABProvider(client, "https://doab.test/rest/search")
+	provider := newDOABProvider(client, "https://doab.test/rest/api/discover/search/objects")
 	results, err := provider.Search(context.Background(), providerRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(results) != 1 || results[0].Title != "Open Biology" || results[0].License == "" || results[0].Year == nil {
 		t.Fatalf("unexpected result: %#v", results)
+	}
+	if results[0].URL != "https://directory.doabooks.org/handle/20.500.12071/123" {
+		t.Fatalf("unexpected URL: %s", results[0].URL)
 	}
 }
 
@@ -123,21 +126,41 @@ func TestLibraryOfCongressSearchMapsBookRecord(t *testing.T) {
 	}
 }
 
-func TestWikidataSearchMapsBindings(t *testing.T) {
+func TestWikidataSearchMapsEntities(t *testing.T) {
 	client := fakeClient(t, func(r *http.Request) string {
-		query := r.URL.Query().Get("query")
-		if !strings.Contains(query, "biology") || !strings.Contains(query, "ORDER BY") {
-			t.Errorf("unexpected SPARQL query: %s", query)
+		query := r.URL.Query()
+		switch query.Get("action") {
+		case "query":
+			if !strings.Contains(query.Get("srsearch"), "biology") || !strings.Contains(query.Get("srsearch"), "haswbstatement:P31=Q571") {
+				t.Errorf("unexpected srsearch: %q", query.Get("srsearch"))
+			}
+			return `{"query":{"search":[{"title":"Q1"}]}}`
+		case "wbgetentities":
+			if query.Get("props") == "labels|claims" {
+				return `{"entities":{"Q1":{"id":"Q1","labels":{"en":{"value":"Biology","language":"en"}},"claims":{"P577":[{"mainsnak":{"datavalue":{"value":{"time":"+2001-01-01T00:00:00Z","precision":9}}}}],"P50":[{"mainsnak":{"datavalue":{"value":{"entity-type":"item","numeric-id":42,"id":"Q42"}}}}],"P921":[{"mainsnak":{"datavalue":{"value":{"id":"Q111"}}}}],"P212":[{"mainsnak":{"datavalue":{"value":"9780123456789"}}}]}}}}`
+			}
+			if !strings.Contains(query.Get("ids"), "Q42") || !strings.Contains(query.Get("ids"), "Q111") {
+				t.Errorf("unexpected label ids: %q", query.Get("ids"))
+			}
+			return `{"entities":{"Q42":{"id":"Q42","labels":{"en":{"value":"Ada Author","language":"en"}}},"Q111":{"id":"Q111","labels":{"en":{"value":"Biology","language":"en"}}}}}`
 		}
-		return `{"results":{"bindings":[{"book":{"value":"http://www.wikidata.org/entity/Q1"},"bookLabel":{"value":"Biology"},"authorLabel":{"value":"Ada Author"},"publication":{"value":"+2001-01-01T00:00:00Z"},"languageLabel":{"value":"English"},"subjectLabel":{"value":"Biology"},"genreLabel":{"value":"non-fiction"},"isbn":{"value":"9780123456789"}}]}}`
+		t.Errorf("unexpected action: %s", r.URL.String())
+		return "{}"
 	})
-	provider := newWikidataProvider(client, "https://wikidata.test/sparql")
+	provider := newWikidataProvider(client, "https://wikidata.test/w/api.php")
 	results, err := provider.Search(context.Background(), providerRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 1 || results[0].Year == nil || *results[0].Year != 2001 || results[0].Source.Provider != "wikidata" {
+	if len(results) != 1 || results[0].Title != "Biology" || results[0].Year == nil || *results[0].Year != 2001 {
 		t.Fatalf("unexpected result: %#v", results)
+	}
+	book := results[0]
+	if len(book.Authors) != 1 || book.Authors[0] != "Ada Author" || len(book.Subjects) != 1 || book.Subjects[0] != "Biology" || len(book.ISBNs) != 1 {
+		t.Fatalf("unexpected metadata: %#v", book)
+	}
+	if book.Source.Provider != "wikidata" || book.URL != "https://www.wikidata.org/wiki/Q1" {
+		t.Fatalf("unexpected source: %#v", book.Source)
 	}
 }
 

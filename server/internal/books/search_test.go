@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,11 +18,13 @@ type stubProvider struct {
 	books      []Book
 	err        error
 	calls      int
+	requests   []SearchRequest
 }
 
 func (p *stubProvider) Capabilities() ProviderCapability { return p.capability }
-func (p *stubProvider) Search(context.Context, SearchRequest) ([]Book, error) {
+func (p *stubProvider) Search(_ context.Context, request SearchRequest) ([]Book, error) {
 	p.calls++
+	p.requests = append(p.requests, request)
 	return p.books, p.err
 }
 
@@ -108,6 +111,85 @@ func TestSearchReturnsErrorWhenNoProviderCanServeRequest(t *testing.T) {
 	}
 }
 
+func TestSearchPaginatesFusedResults(t *testing.T) {
+	catalog := make([]Book, 0, 5)
+	for i := 0; i < 5; i++ {
+		book := discoveryBook("gutendex", fmt.Sprintf("id-%d", i), 10)
+		book.Title = fmt.Sprintf("Book %02d", i)
+		book.ISBNs = []string{fmt.Sprintf("978000000000%d", i)}
+		catalog = append(catalog, book)
+	}
+	provider := &stubProvider{capability: ProviderCapability{ID: "gutendex", Filters: []string{FilterTopics, FilterGenre}}, books: catalog}
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}})
+	query := func(page int) SearchRequest {
+		return SearchRequest{Topics: []string{"biology"}, Limit: 2, Page: page}
+	}
+
+	first, err := service.Search(context.Background(), query(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Page != 1 || len(first.Results) != 2 || !first.HasMore {
+		t.Fatalf("page 1 = %#v", first)
+	}
+	if first.Results[0].Book.Title != "Book 00" || first.Results[1].Book.Title != "Book 01" {
+		t.Fatalf("page 1 titles = %q, %q", first.Results[0].Book.Title, first.Results[1].Book.Title)
+	}
+
+	second, err := service.Search(context.Background(), query(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Page != 2 || len(second.Results) != 2 || !second.HasMore {
+		t.Fatalf("page 2 = %#v", second)
+	}
+	if second.Results[0].Book.Title != "Book 02" || second.Results[1].Book.Title != "Book 03" {
+		t.Fatalf("page 2 titles = %q, %q", second.Results[0].Book.Title, second.Results[1].Book.Title)
+	}
+
+	third, err := service.Search(context.Background(), query(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third.Page != 3 || len(third.Results) != 1 || third.HasMore {
+		t.Fatalf("page 3 = %#v", third)
+	}
+	if third.Results[0].Book.Title != "Book 04" {
+		t.Fatalf("page 3 title = %q", third.Results[0].Book.Title)
+	}
+
+	fourth, err := service.Search(context.Background(), query(4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fourth.Results) != 0 || fourth.HasMore {
+		t.Fatalf("page 4 = %#v", fourth)
+	}
+	last := provider.requests[len(provider.requests)-1]
+	if last.Limit != 8 {
+		t.Fatalf("provider fetch limit = %d, want 8 (page 4 * limit 2)", last.Limit)
+	}
+}
+
+func TestSearchSeedsGenreAsTopicForGenreOnlyBrowse(t *testing.T) {
+	provider := &stubProvider{capability: ProviderCapability{ID: "doab", Filters: []string{FilterTopics, FilterGenre}}, books: []Book{discoveryBook("doab", "1", 1)}}
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}})
+
+	if _, err := service.Search(context.Background(), SearchRequest{Genre: "history"}); err != nil {
+		t.Fatal(err)
+	}
+	if topics := provider.requests[0].Topics; len(topics) != 1 || topics[0] != "history" {
+		t.Fatalf("provider topics = %v, want [history]", topics)
+	}
+
+	if _, err := service.Search(context.Background(), SearchRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if topics := provider.requests[1].Topics; len(topics) != 0 {
+		t.Fatalf("provider topics = %v, want none for the default genre", topics)
+	}
+}
+
 func TestGinSearchAndCapabilitiesHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	provider := &stubProvider{capability: ProviderCapability{ID: "gutendex", Name: "Gutendex", Filters: []string{FilterTopics, FilterGenre}}, books: []Book{discoveryBook("gutendex", "1", 100)}}
@@ -139,5 +221,13 @@ func TestGinSearchAndCapabilitiesHandlers(t *testing.T) {
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/books/search?min_rating=8", nil))
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("invalid search status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	for _, invalidPage := range []string{"page=-1", "page=21"} {
+		response = httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/books/search?"+invalidPage, nil))
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, want %d", invalidPage, response.Code, http.StatusBadRequest)
+		}
 	}
 }

@@ -20,6 +20,7 @@ type searchQuery struct {
 	MinPopularity *float64 `form:"min_popularity"`
 	MinRating     *float64 `form:"min_rating"`
 	Limit         int      `form:"limit"`
+	Page          int      `form:"page"`
 }
 
 func (d *dependencies) HandleSearch(c *gin.Context) {
@@ -41,7 +42,7 @@ func (d *dependencies) HandleSearch(c *gin.Context) {
 	result, err := d.Search(c.Request.Context(), SearchRequest{
 		Topics: query.Topic, Genre: query.Genre, Providers: query.Provider,
 		MinYear: query.MinYear, MaxYear: query.MaxYear, Language: query.Language,
-		MinPopularity: query.MinPopularity, MinRating: query.MinRating, Limit: query.Limit,
+		MinPopularity: query.MinPopularity, MinRating: query.MinRating, Limit: query.Limit, Page: query.Page,
 	})
 	if err != nil {
 		status := http.StatusServiceUnavailable
@@ -98,6 +99,9 @@ func validateQuery(query searchQuery) error {
 	}
 	if query.Limit < 0 || query.Limit > MaxResultLimit {
 		return fmt.Errorf("limit must be between 1 and %d", MaxResultLimit)
+	}
+	if query.Page < 0 || query.Page > MaxSearchPage {
+		return fmt.Errorf("page must be between 1 and %d", MaxSearchPage)
 	}
 	return nil
 }

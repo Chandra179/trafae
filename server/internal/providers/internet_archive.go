@@ -39,7 +39,7 @@ func (p *internetArchiveProvider) Search(ctx context.Context, request books.Sear
 		for _, field := range []string{"title", "creator", "year", "description", "subject", "language", "downloads", "avg_rating", "num_reviews", "licenseurl", "identifier"} {
 			values.Add("fl[]", field)
 		}
-		values.Set("rows", fmt.Sprint(withLimit(request, 100)))
+		values.Set("rows", fmt.Sprint(withLimit(request, 200)))
 		values.Set("page", "1")
 		values.Set("output", "json")
 		var response struct {

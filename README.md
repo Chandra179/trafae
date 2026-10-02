@@ -1,4 +1,4 @@
-## Lux
+## Trafae
 
 Lux is a book discovery service: it searches multiple open book catalogs at
 once, deduplicates the results, and fuses them into a single ranked list. It

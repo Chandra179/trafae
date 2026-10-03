@@ -2,6 +2,14 @@
 
 Date: 2026-10-02 · Status: hypothesis, zero customer evidence yet · Method: INSPIRED (Cagan) discovery
 
+> **Owner decision, 2026-10-03: launch-and-learn.** The value-test interview
+> round was skipped (its guide has been removed). The value hypothesis stays
+> unvalidated; real usage is now the evidence channel. Launch success criteria
+> and the search→read funnel are instrumented server-side instead — see the
+> `/metrics` endpoint and the launch-readiness section of TODO.md. Pass/fail
+> numbers from §3 remain the reference point, measured by funnel data rather
+> than interviews.
+
 ---
 
 ## 1. Problem frame (Workflow 1)

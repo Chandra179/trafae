@@ -19,7 +19,7 @@ type DependenciesConfig struct {
 	// GutenbergFeedClient downloads the daily catalog feed; when nil a
 	// dedicated client with a long timeout is built, since the download is
 	// far larger than any per-search call.
-	GutenbergFeedClient      *http.Client
+	GutenbergFeedClient *http.Client
 	OpenLibraryEmail    string
 	GutenbergCatalogURL string
 }

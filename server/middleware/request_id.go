@@ -61,4 +61,3 @@ func validRequestID(id string) bool {
 	}
 	return true
 }
-

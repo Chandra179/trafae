@@ -64,6 +64,9 @@ func (p *openLibraryProvider) searchTerm(ctx context.Context, request books.Sear
 	values.Set("subject", term)
 	values.Set("limit", fmt.Sprint(limit))
 	values.Set("fields", "key,title,author_name,first_publish_year,subject,isbn,ratings_average,ratings_count,cover_i,language,edition_count")
+	if request.Language != "" {
+		values.Set("language", marcLanguage(request.Language))
+	}
 	var response struct {
 		Docs []map[string]any `json:"docs"`
 	}

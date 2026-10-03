@@ -41,11 +41,16 @@ func (p *internetArchiveProvider) Search(ctx context.Context, request books.Sear
 
 func (p *internetArchiveProvider) searchTerm(ctx context.Context, request books.SearchRequest, term string) ([]books.Book, error) {
 	values := url.Values{}
+	query := "mediatype:texts"
+	if term != "" {
+		query += ` AND (title:"` + escapeQuery(term) + `" OR subject:"` + escapeQuery(term) + `")`
+	}
+	if request.Language != "" {
+		query += " AND language:(" + marcLanguage(request.Language) + ")"
+	}
+	values.Set("q", query)
 	if term == "" {
-		values.Set("q", "mediatype:texts")
 		values.Add("sort[]", "downloads desc")
-	} else {
-		values.Set("q", `mediatype:texts AND (title:"`+escapeQuery(term)+`" OR subject:"`+escapeQuery(term)+`")`)
 	}
 	for _, field := range []string{"title", "creator", "year", "description", "subject", "language", "downloads", "avg_rating", "num_reviews", "licenseurl", "identifier"} {
 		values.Add("fl[]", field)

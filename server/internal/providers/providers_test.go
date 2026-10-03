@@ -312,3 +312,51 @@ func mustOpenSQLite(t *testing.T) *sql.DB {
 	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
+
+func TestLanguageFilterReachesUpstream(t *testing.T) {
+	t.Parallel()
+
+	t.Run("open library", func(t *testing.T) {
+		client := fakeClient(t, func(r *http.Request) string {
+			if got := r.URL.Query().Get("language"); got != "fre" {
+				t.Errorf("language param = %q, want fre", got)
+			}
+			return `{"docs":[]}`
+		})
+		provider := newOpenLibraryProvider(client, "https://openlibrary.test", "")
+		request := providerRequest()
+		request.Language = "fr"
+		if _, err := provider.Search(context.Background(), request); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("internet archive", func(t *testing.T) {
+		provider := newInternetArchiveProvider(responseClient(func(r *http.Request) *http.Response {
+			if q := r.URL.Query().Get("q"); !strings.Contains(q, "language:(fre)") {
+				t.Errorf("q = %q, want a language:(fre) clause", q)
+			}
+			return jsonResponse(r, `{"response":{"docs":[]}}`)
+		}), "https://archive.test/advancedsearch.php")
+		request := providerRequest()
+		request.Language = "fr"
+		if _, err := provider.Search(context.Background(), request); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("wikidata", func(t *testing.T) {
+		client := fakeClient(t, func(r *http.Request) string {
+			if q := r.URL.Query().Get("srsearch"); !strings.Contains(q, "haswbstatement:P407=Q150") {
+				t.Errorf("srsearch = %q, want a P407=Q150 constraint", q)
+			}
+			return `{"query":{"search":[]}}`
+		})
+		provider := newWikidataProvider(client, "https://wikidata.test/w/api.php")
+		request := providerRequest()
+		request.Language = "fr"
+		if _, err := provider.Search(context.Background(), request); err != nil {
+			t.Fatal(err)
+		}
+	})
+}

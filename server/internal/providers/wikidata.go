@@ -56,7 +56,7 @@ func (p *wikidataProvider) searchTerm(ctx context.Context, request books.SearchR
 		"action":   []string{"query"},
 		"list":     []string{"search"},
 		"format":   []string{"json"},
-		"srsearch": []string{strings.TrimSpace(term) + " haswbstatement:P31=Q571"},
+		"srsearch": []string{wikidataBookQuery(term, request.Language)},
 		"srlimit":  []string{strconv.Itoa(wikidataSearchLimit)},
 		"srprop":   []string{""},
 	}
@@ -126,6 +126,18 @@ func (p *wikidataProvider) searchTerm(ctx context.Context, request books.SearchR
 		matched = append(matched, book)
 	}
 	return matched, nil
+}
+
+// wikidataBookQuery builds the entity-search string: books (P31=Q571) for the
+// term, plus the language-of-work constraint (P407) when a known language is
+// requested. Unknown language spellings simply omit the constraint rather
+// than sending a statement Wikidata cannot resolve.
+func wikidataBookQuery(term, language string) string {
+	query := strings.TrimSpace(term) + " haswbstatement:P31=Q571"
+	if qid := wikidataLanguage(language); qid != "" {
+		query += " haswbstatement:P407=" + qid
+	}
+	return query
 }
 
 func (p *wikidataProvider) entities(ctx context.Context, ids []string) (map[string]wikidataEntity, error) {

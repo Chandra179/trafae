@@ -304,6 +304,47 @@ func locLanguage(value string) string {
 	return strings.TrimSpace(value)
 }
 
+// marcLanguage maps any accepted language spelling to the three-letter MARC
+// code that Open Library and Internet Archive filter on.
+func marcLanguage(value string) string {
+	switch gutendexLanguage(value) {
+	case "en":
+		return "eng"
+	case "fr":
+		return "fre"
+	case "de":
+		return "ger"
+	case "es":
+		return "spa"
+	case "it":
+		return "ita"
+	case "pt":
+		return "por"
+	}
+	return strings.TrimSpace(value)
+}
+
+// wikidataLanguage maps any accepted language spelling to the Wikidata item
+// used for "language of work" (P407). Unknown spellings return "" so callers
+// skip the upstream filter instead of sending a nonsense value.
+func wikidataLanguage(value string) string {
+	switch gutendexLanguage(value) {
+	case "en":
+		return "Q1860"
+	case "fr":
+		return "Q150"
+	case "de":
+		return "Q188"
+	case "es":
+		return "Q1321"
+	case "it":
+		return "Q652"
+	case "pt":
+		return "Q5146"
+	}
+	return ""
+}
+
 func stringValue(value any) string {
 	switch v := value.(type) {
 	case string:

@@ -1,6 +1,7 @@
 import { useState } from "react"
 
 import type { Book, SearchResult } from "@/api/books"
+import { sendAccessClick } from "@/api/events"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import {
   formatAuthors,
@@ -121,6 +122,7 @@ export function BookCard({ result }: { result: SearchResult }) {
             href={readUrl}
             rel="noreferrer"
             target="_blank"
+            onClick={() => sendAccessClick(book.source.provider)}
           >
             Read now
           </a>
@@ -135,6 +137,7 @@ export function BookCard({ result }: { result: SearchResult }) {
             href={book.access_urls[1]}
             rel="noreferrer"
             target="_blank"
+            onClick={() => sendAccessClick(book.source.provider)}
           >
             More formats
           </a>

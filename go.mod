@@ -1,4 +1,4 @@
-module github.com/Chandra179/lux
+module github.com/Chandra179/trafae
 
 go 1.26.5
 

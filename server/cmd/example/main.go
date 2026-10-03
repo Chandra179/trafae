@@ -1,8 +1,8 @@
 package main
 
-import "github.com/Chandra179/lux/server"
+import "github.com/Chandra179/trafae/server"
 
-// @title           Lux API
+// @title           Trafae API
 // @version         1.0.0
 // @description     Modular monolith API server
 func main() {

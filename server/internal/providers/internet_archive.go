@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/Chandra179/lux/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/books"
 )
 
 type internetArchiveProvider struct {

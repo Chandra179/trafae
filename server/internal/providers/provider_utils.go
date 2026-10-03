@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Chandra179/lux/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/books"
 )
 
 const maxResponseBytes = 16 << 20

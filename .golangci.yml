@@ -20,7 +20,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/Chandra179/lux
+        - github.com/Chandra179/trafae
 
 run:
   timeout: 5m

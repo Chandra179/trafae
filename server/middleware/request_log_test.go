@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/Chandra179/lux/server/config"
+	"github.com/Chandra179/trafae/server/config"
 )
 
 func TestRequestLogIncludesCorrelationAndSanitizesQuery(t *testing.T) {

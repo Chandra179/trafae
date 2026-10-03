@@ -15,14 +15,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/Chandra179/lux/server/config"
-	"github.com/Chandra179/lux/server/internal/books"
-	"github.com/Chandra179/lux/server/internal/example"
-	"github.com/Chandra179/lux/server/internal/providers"
-	"github.com/Chandra179/lux/server/logger"
-	"github.com/Chandra179/lux/server/middleware"
-	"github.com/Chandra179/lux/server/router"
-	"github.com/Chandra179/lux/server/store"
+	"github.com/Chandra179/trafae/server/config"
+	"github.com/Chandra179/trafae/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/example"
+	"github.com/Chandra179/trafae/server/internal/providers"
+	"github.com/Chandra179/trafae/server/logger"
+	"github.com/Chandra179/trafae/server/middleware"
+	"github.com/Chandra179/trafae/server/router"
+	"github.com/Chandra179/trafae/server/store"
 )
 
 // RunHttpServer starts the configured HTTP server and blocks until it receives

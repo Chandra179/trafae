@@ -10,7 +10,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
-	"github.com/Chandra179/lux/server/middleware"
+	"github.com/Chandra179/trafae/server/middleware"
 )
 
 // New builds the Gin engine: middleware chain, health/swagger routes, and

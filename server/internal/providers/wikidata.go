@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Chandra179/lux/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/books"
 )
 
 // wikidataSearchLimit is the CirrusSearch page size; the Action API allows at

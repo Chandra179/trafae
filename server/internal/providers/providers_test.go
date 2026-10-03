@@ -15,7 +15,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/Chandra179/lux/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/books"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

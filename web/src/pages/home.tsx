@@ -245,7 +245,7 @@ export function HomePage() {
     <div className="space-y-8">
       <section className="mx-auto max-w-3xl space-y-3 pt-6 text-center">
         <p className="font-sans text-[13px] font-semibold uppercase tracking-[0.18em] text-primary">
-          Lux · Free book discovery
+          Trafae · Free book discovery
         </p>
         <h1 className="font-serif text-4xl font-semibold leading-[1.15] tracking-tight sm:text-[44px]">
           The best books on any topic — that you can start reading free, today.

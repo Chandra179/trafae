@@ -3,10 +3,10 @@ GOLANGCI_LINT ?= golangci-lint
 NPM ?= npm
 PODMAN ?= podman
 
-BINARY ?= bin/lux-server
+BINARY ?= bin/trafae-server
 APP_ENVIRONMENT ?= dev
-SQLITE_DSN ?= lux.db
-BADGER_DIR ?= lux
+SQLITE_DSN ?= trafae.db
+BADGER_DIR ?= trafae
 
 .PHONY: all build run test lint fmt tidy verify migrate-up podman-build \
 	web-install web-dev web-build web-lint web-typecheck
@@ -39,7 +39,7 @@ migrate-up:
 	$(GO) run github.com/pressly/goose/v3/cmd/goose@latest -dir server/store/migrations/sqlite sqlite3 "$(SQLITE_DSN)" up
 
 podman-build:
-	$(PODMAN) build -t lux-server .
+	$(PODMAN) build -t trafae-server .
 
 web-install:
 	$(NPM) --prefix web ci

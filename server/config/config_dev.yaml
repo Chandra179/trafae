@@ -18,10 +18,10 @@ middleware:
     query_allowlist: ["topic", "genre", "provider", "min_year", "max_year", "language", "min_popularity", "min_rating", "limit", "page"]
 
 sqlite:
-  dsn: "lux.db"
+  dsn: "trafae.db"
 
 badger:
-  dir: "lux"
+  dir: "trafae"
 
 books:
   default_genre: "non-fiction"

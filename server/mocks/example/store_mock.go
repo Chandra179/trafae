@@ -6,7 +6,7 @@ package mocks
 
 import (
 	"context"
-	"github.com/Chandra179/lux/server/internal/example"
+	"github.com/Chandra179/trafae/server/internal/example"
 
 	mock "github.com/stretchr/testify/mock"
 )

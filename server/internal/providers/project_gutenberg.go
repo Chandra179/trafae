@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Chandra179/lux/server/internal/books"
+	"github.com/Chandra179/trafae/server/internal/books"
 )
 
 // gutenbergFeedTimeout bounds the daily catalog download. The feed is a large

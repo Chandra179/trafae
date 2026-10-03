@@ -6,8 +6,8 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     env:
-      SQLITE_DSN: lux.db
-      BADGER_DIR: lux
+      SQLITE_DSN: trafae.db
+      BADGER_DIR: trafae
     steps:
       - uses: actions/checkout@v4
 

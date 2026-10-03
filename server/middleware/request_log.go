@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/Chandra179/lux/server/config"
+	"github.com/Chandra179/trafae/server/config"
 )
 
 // RequestLog returns Gin middleware that logs one canonical line per HTTP

@@ -51,11 +51,16 @@ func (c *searchCache) get(request SearchRequest, now time.Time) (SearchResponse,
 	return entry.response, true
 }
 
-// put stores a response for the normalized request. Responses containing an
-// errored provider are never cached: they are the degradation path, and the
-// next identical request should retry the failed provider immediately.
+// put stores a response for the normalized request. Search only reaches this
+// point when at least one provider succeeded, so degraded responses (some
+// providers errored) are cached too: on networks where a provider is blocked,
+// the strict alternative would never cache at all and every request would
+// re-fan-out to the healthy providers. Provider statuses inside a cached
+// response describe the fetch that built it and are frozen until the entry
+// expires; a fully failed search returns an error before it gets here and is
+// never cached.
 func (c *searchCache) put(request SearchRequest, response SearchResponse, now time.Time) {
-	if c == nil || c.ttl <= 0 || hasErrorStatus(response) {
+	if c == nil || c.ttl <= 0 {
 		return
 	}
 	c.mu.Lock()
@@ -88,15 +93,6 @@ func (c *searchCache) evictLocked(now time.Time) {
 	if oldestKey != "" {
 		delete(c.entries, oldestKey)
 	}
-}
-
-func hasErrorStatus(response SearchResponse) bool {
-	for _, status := range response.Providers {
-		if status.Status == "error" {
-			return true
-		}
-	}
-	return false
 }
 
 // cacheKey canonically serializes the normalized request so topic order,

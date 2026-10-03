@@ -44,7 +44,7 @@ func TestSearchServesIdenticalRequestsFromCache(t *testing.T) {
 	}
 }
 
-func TestSearchDoesNotCacheErroredProviders(t *testing.T) {
+func TestSearchDoesNotCacheTotalProviderFailure(t *testing.T) {
 	t.Parallel()
 
 	provider := &stubProvider{capability: ProviderCapability{ID: "gutendex", Filters: []string{FilterTopics, FilterGenre}}, err: context.DeadlineExceeded}
@@ -56,7 +56,36 @@ func TestSearchDoesNotCacheErroredProviders(t *testing.T) {
 		}
 	}
 	if provider.calls != 2 {
-		t.Fatalf("provider called %d times, want 2 (failed responses must not be cached)", provider.calls)
+		t.Fatalf("provider called %d times, want 2 (failed searches must not be cached)", provider.calls)
+	}
+}
+
+func TestSearchCachesDegradedResponses(t *testing.T) {
+	t.Parallel()
+
+	// On networks where a provider is blocked, every response is degraded;
+	// the cache must still engage or every request re-fans out upstream.
+	healthy := &stubProvider{capability: ProviderCapability{ID: "open_library", Filters: []string{FilterTopics, FilterGenre}}, books: []Book{discoveryBook("open_library", "OL1W", 50)}}
+	blocked := &stubProvider{capability: ProviderCapability{ID: "doab", Filters: []string{FilterTopics, FilterGenre}}, err: context.DeadlineExceeded}
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{healthy, blocked}, SearchCacheTTL: time.Minute})
+	request := SearchRequest{Topics: []string{"history"}}
+
+	first, err := service.Search(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Search(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if healthy.calls != 1 || blocked.calls != 1 {
+		t.Fatalf("provider calls = (healthy %d, blocked %d), want (1, 1) — second request must be served from cache", healthy.calls, blocked.calls)
+	}
+	if len(second.Results) != len(first.Results) {
+		t.Fatalf("cached result count = %d, want %d", len(second.Results), len(first.Results))
+	}
+	if second.Providers[0].Status != "error" || second.Providers[1].Status != "ok" {
+		t.Fatalf("cached response must report the statuses observed when it was built, got %#v", second.Providers)
 	}
 }
 

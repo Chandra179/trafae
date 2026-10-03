@@ -131,11 +131,12 @@ IPs are taken from the connection address (trusted proxies are disabled), so
 a spoofed `X-Forwarded-For` cannot rotate limits. If you deploy behind a
 reverse proxy, configure gin's trusted proxies accordingly.
 
-The search cache serves identical successful requests from memory for
+The search cache serves identical requests from memory for
 `books.cache_ttl_in_second` (default 300s), which absorbs bursts without
-hammering rate-limited upstreams. Responses in which a provider errored are
-never cached, so the next request retries that provider; cached responses
-report the provider statuses observed when they were built.
+hammering rate-limited upstreams. Any search in which at least one provider
+succeeded is cached; a fully failed search is never cached. Cached responses
+report the provider statuses observed when they were built, and the TTL is
+when the next request retries every provider.
 
 ### Frontend
 

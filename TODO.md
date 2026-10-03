@@ -82,10 +82,11 @@ channel, so the funnel is instrumented and the API is protected.
   client address on the API routes (probes and `/metrics` exempt); trusted
   proxies disabled so spoofed `X-Forwarded-For` cannot rotate buckets.
   (`server/middleware/rate_limit.go`, `router/router.go`)
-- [x] **Short-TTL search cache** — identical successful searches are served
-  from memory for `books.cache_ttl_in_second` (300s default), capping upstream
-  fan-out on bursts; responses with an errored provider are never cached.
-  (`server/internal/books/search_cache.go`)
+- [x] **Short-TTL search cache** — identical searches are served from memory
+  for `books.cache_ttl_in_second` (300s default), capping upstream fan-out on
+  bursts; degraded responses (some providers blocked) are cached too, so the
+  cache still engages on networks where providers are hard-blocked. Totally
+  failed searches are never cached. (`server/internal/books/search_cache.go`)
 - [x] **Schema migrations on boot** — see the #9 entry above.
 - [x] **Rename completed, dead Swagger route removed** — see #10 above.
 

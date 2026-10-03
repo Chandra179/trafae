@@ -73,13 +73,25 @@ func validateQuery(query searchQuery) error {
 		if strings.TrimSpace(topic) == "" {
 			return errors.New("topic values must not be empty")
 		}
+		if len(strings.TrimSpace(topic)) > MaxParamLength {
+			return fmt.Errorf("topic values must be at most %d characters", MaxParamLength)
+		}
 	}
 	if len(query.Topic) > MaxSearchTopics {
 		return fmt.Errorf("at most %d topic values are allowed", MaxSearchTopics)
 	}
+	if strings.TrimSpace(query.Genre) != "" && len(strings.TrimSpace(query.Genre)) > MaxParamLength {
+		return fmt.Errorf("genre must be at most %d characters", MaxParamLength)
+	}
+	if strings.TrimSpace(query.Language) != "" && len(strings.TrimSpace(query.Language)) > MaxParamLength {
+		return fmt.Errorf("language must be at most %d characters", MaxParamLength)
+	}
 	for _, provider := range query.Provider {
 		if strings.TrimSpace(provider) == "" {
 			return errors.New("provider values must not be empty")
+		}
+		if len(strings.TrimSpace(provider)) > MaxParamLength {
+			return fmt.Errorf("provider values must be at most %d characters", MaxParamLength)
 		}
 	}
 	if query.MinYear != nil && (*query.MinYear < -3000 || *query.MinYear > 3000) {
@@ -98,7 +110,7 @@ func validateQuery(query searchQuery) error {
 		return errors.New("min_rating must be between 0 and 5")
 	}
 	if query.Limit < 0 || query.Limit > MaxResultLimit {
-		return fmt.Errorf("limit must be between 1 and %d", MaxResultLimit)
+		return fmt.Errorf("limit must be between 0 and %d (0 uses the default of %d)", MaxResultLimit, DefaultResultLimit)
 	}
 	if query.Page < 0 || query.Page > MaxSearchPage {
 		return fmt.Errorf("page must be between 1 and %d", MaxSearchPage)

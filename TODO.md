@@ -6,7 +6,7 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 
 ## Bugs
 
-- [ ] 🔴 **Gutendex drops every topic after the first** — the page-walk loop condition uses
+- [x] 🔴 **Gutendex drops every topic after the first** — the page-walk loop condition uses
   the accumulator shared across all topic terms, so term 1 fills it and terms 2..8 never
   execute. (`server/internal/providers/gutendex.go:44`) [#3](https://github.com/Chandra179/trafae/issues/3)
 - [ ] 🔴 **Shared http.Client timeout caps per-provider timeouts** — client `Timeout: 18s`
@@ -26,18 +26,18 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   generated or imported; README advertises it. (`router/router.go:55`) [#10](https://github.com/Chandra179/trafae/issues/10)
 - [ ] 🟡 **Project Gutenberg feed refresh races the 18s client timeout** — full gzipped-CSV
   download streamed through the shared client. (`project_gutenberg.go:129`) [#8](https://github.com/Chandra179/trafae/issues/8)
-- [ ] 🟡 **"Non-fiction (all)" chip can never start a search** — `runSearch` omits the default
+- [x] 🟡 **"Non-fiction (all)" chip can never start a search** — `runSearch` omits the default
   genre from the URL while `searched` requires topic or genre param.
-  (`web/src/pages/home.tsx:199,162`) [#13](https://github.com/Chandra179/trafae/issues/13)
-- [ ] 🟡 **Stale `?page` past the last page dead-ends** — empty results render without
+  (`web/src/pages/home.tsx:199,162`) [#12](https://github.com/Chandra179/trafae/issues/12)
+- [x] 🟡 **Stale `?page` past the last page dead-ends** — empty results render without
   pagination controls, so there is no way back to page 1. (`web/src/pages/home.tsx:317-356`)
-  [#14](https://github.com/Chandra179/trafae/issues/14)
+  [#13](https://github.com/Chandra179/trafae/issues/13)
 - [ ] 🟡 **Search inputs don't re-sync with URL on back/forward nav; staged filter edits are
   silently dropped by paging.** (`web/src/pages/home.tsx:164-171,280,208`)
-  [#15](https://github.com/Chandra179/trafae/issues/15)
+  [#14](https://github.com/Chandra179/trafae/issues/14)
 - [ ] 🟡 **Genre matching heuristic is loose and duplicated** — bidirectional substring matching
   over-matches; the non-fiction keyword list is hardcoded in two places.
-  (`search.go` `genreMatches`, `project_gutenberg.go:42-43`) [#17](https://github.com/Chandra179/trafae/issues/17)
+  (`search.go` `genreMatches`, `project_gutenberg.go:42-43`) [#16](https://github.com/Chandra179/trafae/issues/16)
 
 ## Performance
 
@@ -47,7 +47,7 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   (`open_library.go:43-96`, `doab.go:32-80`, `library_of_congress.go:32-65`,
   `internet_archive.go:31-73`, `gutendex.go:32-84`, `wikidata.go:43-51`)
   [#5](https://github.com/Chandra179/trafae/issues/5)
-- [ ] 🟡 **Cover images load eagerly** — 24 remote fetches per page; add
+- [x] 🟡 **Cover images load eagerly** — 24 remote fetches per page; add
   `loading="lazy" decoding="async"`. (`web/src/components/book-card.tsx:41-46`)
   [#18](https://github.com/Chandra179/trafae/issues/18)
 
@@ -55,7 +55,7 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 
 - [ ] 🟡 **Zero frontend tests** — no vitest, no test script; CI runs only lint/typecheck/build
   for `web/`. The URL-state machine in `home.tsx` is the most intricate logic in the app.
-  [#16](https://github.com/Chandra179/trafae/issues/16)
+  [#15](https://github.com/Chandra179/trafae/issues/15)
 - [ ] 🟡 **Unpinned tool versions** — golangci-lint `version: v2` (floating), goose `@latest`,
   and three different Go version references (`go.mod` 1.26.5 vs CI 1.27.0 vs Containerfile
   `golang:1.27`). [#11](https://github.com/Chandra179/trafae/issues/11)
@@ -66,13 +66,13 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   pointless); gRPC interceptor never registered (sole reason for the grpc/protobuf deps);
   unused generated mocks in `server/mocks/`; unused provider base-URL config seams; empty
   scaffold files (`AGENTS.md`, `lefthook.yml`, `internal/constant/`).
-  [#12](https://github.com/Chandra179/trafae/issues/12)
+  [#17](https://github.com/Chandra179/trafae/issues/17)
 - [ ] ⚪ **Frontend**: unused `badge.tsx`, `api/health.ts`, `api/examples.ts`,
   `providerSummary`, `lib/utils.ts` (dead `cn` split — npm `cn` package vs `@/lib/utils`,
   making `clsx` + `tailwind-merge` dead deps too); `radix-ui` Slot and `tw-animate-css`
   effectively unused; unused `CardTitle`/`CardDescription`/`CardAction` exports.
-  [#12](https://github.com/Chandra179/trafae/issues/12)
-- [ ] ⚪ **Small hardening batch**: cap string param lengths; fix misleading `limit` error
+  [#17](https://github.com/Chandra179/trafae/issues/17)
+- [x] ⚪ **Small hardening batch**: cap string param lengths; fix misleading `limit` error
   text; add `page` to the dev log allowlist; bound year inputs; description line-clamp and
   title `break-words`; result-key collision fallback.
   [#18](https://github.com/Chandra179/trafae/issues/18)

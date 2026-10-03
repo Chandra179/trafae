@@ -15,7 +15,7 @@ middleware:
   request_log:
     skip_paths: ["/health"]
     log_query: true
-    query_allowlist: ["topic", "genre", "provider", "min_year", "max_year", "language", "min_popularity", "min_rating", "limit"]
+    query_allowlist: ["topic", "genre", "provider", "min_year", "max_year", "language", "min_popularity", "min_rating", "limit", "page"]
 
 sqlite:
   dsn: "lux.db"

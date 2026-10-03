@@ -29,6 +29,8 @@ func (p *gutendexProvider) Search(ctx context.Context, request books.SearchReque
 		terms = []string{""}
 	}
 	var found bookAccumulator
+	target := withLimit(request, 200)
+	maxPages := 8
 	for _, term := range terms {
 		values := url.Values{}
 		if term != "" {
@@ -39,9 +41,8 @@ func (p *gutendexProvider) Search(ctx context.Context, request books.SearchReque
 			values.Set("languages", gutendexLanguage(request.Language))
 		}
 		pageURL := p.endpoint + "?" + values.Encode()
-		target := withLimit(request, 200)
-		maxPages := 8
-		for page := 0; page < maxPages && len(found.items) < target; page++ {
+		collected := 0
+		for page := 0; page < maxPages && collected < target; page++ {
 			var response struct {
 				Next    string `json:"next"`
 				Results []struct {
@@ -73,7 +74,9 @@ func (p *gutendexProvider) Search(ctx context.Context, request books.SearchReque
 				book.Genres = append([]string(nil), book.Subjects...)
 				book.AccessURLs = formatURLs(item.Formats)
 				book.Source = books.BookSource{Provider: "gutendex", ID: book.ID, URL: book.URL}
-				found.add(book)
+				if found.add(book) {
+					collected++
+				}
 			}
 			nextURL := safeNextURL(p.endpoint, response.Next)
 			if nextURL == "" {

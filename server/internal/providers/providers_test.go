@@ -72,6 +72,32 @@ func TestGutendexSearchMapsTopicsAndDownloads(t *testing.T) {
 	}
 }
 
+func TestGutendexSearchesEveryTopic(t *testing.T) {
+	items := make([]string, 0, 30)
+	for i := 0; i < 30; i++ {
+		items = append(items, fmt.Sprintf(`{"id":%d,"title":"Book %d","authors":[{"name":"Ada Author"}]}`, i, i))
+	}
+	body := `{"next":null,"results":[` + strings.Join(items, ",") + `]}`
+	var topics []string
+	client := fakeClient(t, func(r *http.Request) string {
+		topics = append(topics, r.URL.Query().Get("topic"))
+		return body
+	})
+	provider := newGutendexProvider(client, "https://gutendex.test/books")
+	request := providerRequest()
+	request.Topics = []string{"biology", "history"}
+	results, err := provider.Search(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(topics) != 2 || topics[0] != "biology" || topics[1] != "history" {
+		t.Fatalf("upstream topics = %v, want one request per topic", topics)
+	}
+	if len(results) != 30 {
+		t.Fatalf("results = %d, want 30", len(results))
+	}
+}
+
 func TestDOABSearchMapsMetadata(t *testing.T) {
 	client := fakeClient(t, func(r *http.Request) string {
 		if !strings.Contains(r.URL.Query().Get("query"), "biology") || r.URL.Query().Get("page") != "0" || r.URL.Query().Get("size") == "" {

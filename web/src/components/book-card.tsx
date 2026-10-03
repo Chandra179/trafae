@@ -41,6 +41,8 @@ function BookCover({ book }: { book: Book }) {
       <img
         alt={`Cover of ${book.title}`}
         className="h-full w-full object-cover"
+        decoding="async"
+        loading="lazy"
         onError={() => setFailed(true)}
         src={book.cover_url}
       />
@@ -68,7 +70,7 @@ export function BookCard({ result }: { result: SearchResult }) {
           <BookCover book={book} />
         </div>
         <CardHeader className="min-w-0 flex-1 gap-0 p-0">
-          <h3 className="font-serif text-[17px] font-bold leading-[1.3]">{book.title}</h3>
+          <h3 className="break-words font-serif text-[17px] font-bold leading-[1.3]">{book.title}</h3>
           <p className="mt-0.5 font-serif text-sm italic text-muted-foreground">
             {formatAuthors(book)}
           </p>
@@ -96,7 +98,7 @@ export function BookCard({ result }: { result: SearchResult }) {
 
       <CardContent className="flex flex-1 flex-col gap-2 px-4 pt-3">
         {book.description && (
-          <p className="text-sm leading-snug text-muted-foreground">{book.description}</p>
+          <p className="line-clamp-4 text-sm leading-snug text-muted-foreground">{book.description}</p>
         )}
         {book.subjects && book.subjects.length > 0 && (
           <p className="truncate font-sans text-xs text-muted-foreground/80">

@@ -230,4 +230,19 @@ func TestGinSearchAndCapabilitiesHandlers(t *testing.T) {
 			t.Fatalf("%s status = %d, want %d", invalidPage, response.Code, http.StatusBadRequest)
 		}
 	}
+
+	longValue := strings.Repeat("a", MaxParamLength+1)
+	for _, tc := range []struct{ name, query string }{
+		{"negative limit", "limit=-1"},
+		{"limit above max", "limit=51"},
+		{"over-long topic", "topic=" + longValue},
+		{"over-long genre", "genre=" + longValue},
+		{"over-long language", "language=" + longValue},
+	} {
+		response = httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/books/search?"+tc.query, nil))
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s: status = %d, want %d", tc.name, response.Code, http.StatusBadRequest)
+		}
+	}
 }

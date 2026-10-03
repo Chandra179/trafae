@@ -264,7 +264,7 @@ type bookAccumulator struct {
 	seen  map[string]int
 }
 
-func (a *bookAccumulator) add(book books.Book) {
+func (a *bookAccumulator) add(book books.Book) bool {
 	if a.seen == nil {
 		a.seen = make(map[string]int)
 	}
@@ -293,10 +293,11 @@ func (a *bookAccumulator) add(book books.Book) {
 		if current.Rating == nil {
 			current.Rating = book.Rating
 		}
-		return
+		return false
 	}
 	a.seen[key] = len(a.items)
 	a.items = append(a.items, book)
+	return true
 }
 
 func (a *bookAccumulator) all() []books.Book { return a.items }

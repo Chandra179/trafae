@@ -18,6 +18,9 @@ const (
 	MaxResultLimit     = 50
 	MaxSearchTopics    = 8
 	MaxSearchPage      = 20
+	// MaxParamLength bounds free-text query parameters (topic, genre, language,
+	// provider) before they are interpolated into upstream URLs and SQL patterns.
+	MaxParamLength = 100
 	// DefaultSearchTimeout bounds each provider call when the wiring does not
 	// supply providers.search_timeout_in_second.
 	DefaultSearchTimeout = 30 * time.Second

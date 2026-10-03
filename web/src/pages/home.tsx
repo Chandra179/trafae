@@ -123,6 +123,8 @@ function Filters({
         <input
           aria-label="Year from"
           className={inputClass}
+          max={3000}
+          min={-3000}
           onChange={(event) => onChange({ ...filters, minYear: event.target.value })}
           placeholder="From year"
           type="number"
@@ -132,6 +134,8 @@ function Filters({
         <input
           aria-label="Year to"
           className={inputClass}
+          max={3000}
+          min={-3000}
           onChange={(event) => onChange({ ...filters, maxYear: event.target.value })}
           placeholder="To year"
           type="number"
@@ -193,10 +197,12 @@ export function HomePage() {
     return () => controller.abort()
   }, [searched, topic, genre, page, requestKey, searchParams])
 
-  function runSearch(nextTopic: string, nextGenre: string, nextFilters: FilterState) {
+  function runSearch(nextTopic: string, nextGenre: string, nextFilters: FilterState, explicitGenre = false) {
     const params = new URLSearchParams()
     if (nextTopic.trim()) params.set("topic", nextTopic.trim())
-    if (nextGenre !== "non-fiction") params.set("genre", nextGenre)
+    // A genre-chip click must always write the param: without it, a default-genre
+    // browse produces an empty URL and `searched` never turns true.
+    if (nextGenre !== "non-fiction" || explicitGenre) params.set("genre", nextGenre)
     if (nextFilters.language) params.set("language", nextFilters.language)
     if (nextFilters.minRating) params.set("min_rating", nextFilters.minRating)
     if (nextFilters.minYear) params.set("min_year", nextFilters.minYear)
@@ -268,7 +274,7 @@ export function HomePage() {
             <button
               className={chipClass(item === genre)}
               key={item}
-              onClick={() => runSearch(topicInput, item, filters)}
+              onClick={() => runSearch(topicInput, item, filters, true)}
               type="button"
             >
               {genreLabel(item)}
@@ -316,43 +322,55 @@ export function HomePage() {
 
           {!loading && !error && results.length === 0 && (
             <div className="rounded-lg border border-border bg-card p-8 text-center">
-              <p className="font-semibold">No books matched</p>
+              <p className="font-semibold">
+                {page > 1 ? "This page is past the end of the results" : "No books matched"}
+              </p>
               <p className="mt-1 font-sans text-sm text-muted-foreground">
-                Try a broader topic, another genre, or fewer filters.
+                {page > 1
+                  ? "Step back to the last page with Previous."
+                  : "Try a broader topic, another genre, or fewer filters."}
               </p>
             </div>
           )}
 
           {!loading && !error && results.length > 0 && (
-            <>
-              <div className="grid gap-[22px] py-5 md:grid-cols-2 xl:grid-cols-3">
-                {results.map((result) => (
+            <div className="grid gap-[22px] py-5 md:grid-cols-2 xl:grid-cols-3">
+              {results.map((result, index) => {
+                const { book } = result
+                return (
                   <BookCard
-                    key={`${result.book.source.provider}:${result.book.source.id ?? result.book.title}`}
+                    key={
+                      book.source.id
+                        ? `${book.source.provider}:${book.source.id}`
+                        : `${book.source.provider}:${book.title}:${book.year ?? ""}:${index}`
+                    }
                     result={result}
                   />
-                ))}
-              </div>
-              <nav aria-label="Result pages" className="flex items-center justify-center gap-4 border-t border-border pt-5">
-                <Button
-                  disabled={page <= 1 || loading}
-                  onClick={() => changePage(page - 1)}
-                  size="sm"
-                  variant="outline"
-                >
-                  ← Previous
-                </Button>
-                <span className="font-serif text-sm text-muted-foreground">Page {page}</span>
-                <Button
-                  disabled={!response?.has_more || loading}
-                  onClick={() => changePage(page + 1)}
-                  size="sm"
-                  variant="outline"
-                >
-                  Next →
-                </Button>
-              </nav>
-            </>
+                )
+              })}
+            </div>
+          )}
+
+          {!loading && !error && (results.length > 0 || page > 1) && (
+            <nav aria-label="Result pages" className="flex items-center justify-center gap-4 border-t border-border pt-5">
+              <Button
+                disabled={page <= 1}
+                onClick={() => changePage(page - 1)}
+                size="sm"
+                variant="outline"
+              >
+                ← Previous
+              </Button>
+              <span className="font-serif text-sm text-muted-foreground">Page {page}</span>
+              <Button
+                disabled={!response?.has_more}
+                onClick={() => changePage(page + 1)}
+                size="sm"
+                variant="outline"
+              >
+                Next →
+              </Button>
+            </nav>
           )}
         </section>
       )}

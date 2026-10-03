@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -64,6 +65,20 @@ type SQLiteConfig struct {
 
 type BadgerConfig struct {
 	Dir string `yaml:"dir"`
+}
+
+// Environment returns the APP_ENVIRONMENT value, defaulting to dev.
+func Environment() string {
+	appEnvironment := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENVIRONMENT")))
+	if appEnvironment == "" {
+		appEnvironment = "dev"
+	}
+	return appEnvironment
+}
+
+// Path returns the config file path for the given environment.
+func Path(appEnvironment string) string {
+	return filepath.Join("server", "config", "config_"+appEnvironment+".yaml")
 }
 
 func Load(path string) (*Config, error) {

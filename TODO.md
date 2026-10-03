@@ -26,9 +26,13 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 - [ ] 🟡 **Language filter declared but never sent upstream** by Open Library, DOAB, Internet
   Archive and Wikidata — capped fetch windows can saturate with wrong-language hits, yielding
   zero results despite upstream matches. [#7](https://github.com/Chandra179/trafae/issues/7)
-- [ ] 🟡 **Schema lives in two places; server never migrates on boot** — no goose wiring in Go
+- [x] 🟡 **Schema lives in two places; server never migrates on boot** — no goose wiring in Go
   code, and PG tables are created twice (`ensureSchema` vs migration `00002`), which can drift.
-  (`project_gutenberg.go:214-234`) [#9](https://github.com/Chandra179/trafae/issues/9)
+  Fixed: embedded goose migrations are applied on boot (`store.Migrate`, also exposed as
+  `server/cmd/migrate`); `ensureSchema` and its mutex/flag are deleted; migration `00002` is
+  idempotent so pre-goose databases migrate cleanly; CI and `make migrate-up` run the same
+  code path instead of `goose@latest`.
+  (`store/migrate.go`, `server.go`, `project_gutenberg.go`, `cmd/migrate/`) [#9](https://github.com/Chandra179/trafae/issues/9)
 - [ ] 🟡 **Swagger UI route is dead** — `/swagger/*any` is mounted but no swag docs package is
   generated or imported; README advertises it. (`router/router.go:55`) [#10](https://github.com/Chandra179/trafae/issues/10)
 - [x] 🟡 **Project Gutenberg feed refresh races the 18s client timeout** — full gzipped-CSV

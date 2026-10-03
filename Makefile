@@ -36,7 +36,7 @@ verify:
 	$(GO) mod verify
 
 migrate-up:
-	$(GO) run github.com/pressly/goose/v3/cmd/goose@latest -dir server/store/migrations/sqlite sqlite3 "$(SQLITE_DSN)" up
+	$(GO) run ./server/cmd/migrate
 
 podman-build:
 	$(PODMAN) build -t trafae-server .

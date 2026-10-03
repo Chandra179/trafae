@@ -47,7 +47,7 @@ jobs:
         run: go test -short -race -count=1 ./...
 
       - name: Migrate
-        run: go run github.com/pressly/goose/v3/cmd/goose@latest -dir server/store/migrations/sqlite sqlite3 "$SQLITE_DSN" up
+        run: go run ./server/cmd/migrate
 
       - name: Build
         run: go build ./...

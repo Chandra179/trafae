@@ -69,10 +69,12 @@ On startup the server syncs the official Project Gutenberg catalog (a gzipped
 CSV) into SQLite and refreshes it every 24 hours. Searches against it run
 locally; the other providers are called over HTTP.
 
-Schema changes are applied with goose (the server does not migrate on boot):
+Schema migrations (embedded goose SQL scripts) are applied automatically on
+boot, so a fresh deployment is searchable with no extra step. To apply them
+explicitly instead:
 
 ```bash
-make migrate-up
+make migrate-up   # runs server/cmd/migrate
 ```
 
 ### Configuration

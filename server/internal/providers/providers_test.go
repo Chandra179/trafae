@@ -16,6 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/Chandra179/trafae/server/internal/books"
+	"github.com/Chandra179/trafae/server/store"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -272,6 +273,9 @@ func TestProjectGutenbergRefreshesOfficialCompressedCatalog(t *testing.T) {
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
+	if err := store.Migrate(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
 	provider := newProjectGutenbergProvider(db, client, "https://gutenberg.test/catalog.csv.gz")
 	if err := provider.refresh(context.Background()); err != nil {
 		t.Fatal(err)

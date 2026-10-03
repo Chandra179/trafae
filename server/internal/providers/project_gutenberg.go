@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Chandra179/trafae/server/internal/books"
@@ -23,12 +22,13 @@ import (
 // reason.
 const gutenbergFeedTimeout = 10 * time.Minute
 
+// projectGutenbergProvider searches the locally synced official catalog. The
+// catalog tables are created by the store migrations, which the server applies
+// on boot.
 type projectGutenbergProvider struct {
-	db          *sql.DB
-	feedClient  *http.Client
-	feedURL     string
-	initMu      sync.Mutex
-	schemaReady bool
+	db         *sql.DB
+	feedClient *http.Client
+	feedURL    string
 }
 
 func newProjectGutenbergProvider(db *sql.DB, feedClient *http.Client, feedURL string) *projectGutenbergProvider {
@@ -43,9 +43,6 @@ func (p *projectGutenbergProvider) Capabilities() books.ProviderCapability {
 }
 
 func (p *projectGutenbergProvider) Search(ctx context.Context, request books.SearchRequest) ([]books.Book, error) {
-	if err := p.ensureSchema(ctx); err != nil {
-		return nil, err
-	}
 	terms := queryTerms(request)
 	if len(terms) == 0 {
 		if strings.EqualFold(strings.ReplaceAll(request.Genre, "-", " "), "non fiction") {
@@ -111,9 +108,6 @@ func (p *projectGutenbergProvider) Search(ctx context.Context, request books.Sea
 }
 
 func (p *projectGutenbergProvider) refreshIfNeeded(ctx context.Context) error {
-	if err := p.ensureSchema(ctx); err != nil {
-		return err
-	}
 	var syncedAt sql.NullInt64
 	if err := p.db.QueryRowContext(ctx, `SELECT synced_at FROM project_gutenberg_catalog_sync WHERE id = 1`).Scan(&syncedAt); err != nil && err != sql.ErrNoRows {
 		return err
@@ -125,9 +119,6 @@ func (p *projectGutenbergProvider) refreshIfNeeded(ctx context.Context) error {
 }
 
 func (p *projectGutenbergProvider) refresh(ctx context.Context) error {
-	if err := p.ensureSchema(ctx); err != nil {
-		return err
-	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, p.feedURL, nil)
 	if err != nil {
 		return err
@@ -214,31 +205,6 @@ func (p *projectGutenbergProvider) refresh(ctx context.Context) error {
 	if err := rows.Commit(); err != nil {
 		return fmt.Errorf("commit Project Gutenberg catalog: %w", err)
 	}
-	return nil
-}
-
-// ensureSchema creates the catalog tables once. A failed attempt is not
-// remembered, so a transient error (for example a busy database at startup)
-// does not disable the provider for the lifetime of the process.
-func (p *projectGutenbergProvider) ensureSchema(ctx context.Context) error {
-	p.initMu.Lock()
-	defer p.initMu.Unlock()
-	if p.schemaReady {
-		return nil
-	}
-	if _, err := p.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS project_gutenberg_catalog (
-		id TEXT PRIMARY KEY, title TEXT NOT NULL, authors TEXT NOT NULL DEFAULT '', subjects TEXT NOT NULL DEFAULT '',
-		bookshelves TEXT NOT NULL DEFAULT '', languages TEXT NOT NULL DEFAULT '', issued_year INTEGER NULL, downloads INTEGER NOT NULL DEFAULT 0
-	)`); err != nil {
-		return err
-	}
-	if _, err := p.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_project_gutenberg_title ON project_gutenberg_catalog(title)`); err != nil {
-		return err
-	}
-	if _, err := p.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS project_gutenberg_catalog_sync (id INTEGER PRIMARY KEY CHECK(id = 1), synced_at INTEGER NOT NULL)`); err != nil {
-		return err
-	}
-	p.schemaReady = true
 	return nil
 }
 

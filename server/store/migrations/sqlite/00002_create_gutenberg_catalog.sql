@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE project_gutenberg_catalog (
+CREATE TABLE IF NOT EXISTS project_gutenberg_catalog (
     id          text PRIMARY KEY,
     title       text NOT NULL,
     authors     text NOT NULL DEFAULT '',
@@ -9,8 +9,8 @@ CREATE TABLE project_gutenberg_catalog (
     issued_year integer,
     downloads   integer NOT NULL DEFAULT 0
 );
-CREATE INDEX idx_project_gutenberg_title ON project_gutenberg_catalog(title);
-CREATE TABLE project_gutenberg_catalog_sync (
+CREATE INDEX IF NOT EXISTS idx_project_gutenberg_title ON project_gutenberg_catalog(title);
+CREATE TABLE IF NOT EXISTS project_gutenberg_catalog_sync (
     id        integer PRIMARY KEY CHECK (id = 1),
     synced_at integer NOT NULL
 );

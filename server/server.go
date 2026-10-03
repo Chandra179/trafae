@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -35,15 +34,10 @@ func RunHttpServer() {
 }
 
 func runHTTPServer() error {
-	appEnvironment := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENVIRONMENT")))
-	if appEnvironment == "" {
-		appEnvironment = "dev"
-	}
-
-	configPath := filepath.Join("server", "config", "config_"+appEnvironment+".yaml")
-	cfg, err := config.Load(configPath)
+	appEnvironment := config.Environment()
+	cfg, err := config.Load(config.Path(appEnvironment))
 	if err != nil {
-		return fmt.Errorf("load config %q: %w", configPath, err)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	log, err := logger.NewLogger(
@@ -65,6 +59,12 @@ func runHTTPServer() error {
 		return err
 	}
 	defer func() { _ = db.Close() }()
+
+	// The schema must exist before providers and handlers touch the database;
+	// applying it here makes a fresh deployment searchable with no extra step.
+	if err := store.Migrate(ctx, db); err != nil {
+		return err
+	}
 
 	badgerDB, err := store.NewBadger(cfg.Badger.Dir)
 	if err != nil {

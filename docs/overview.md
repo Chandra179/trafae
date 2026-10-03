@@ -15,8 +15,8 @@ created: 2026-10-03
 Trafae is a book discovery service for readers who want to go deep on a
 topic and start reading immediately. Ask it for a subject or browse by
 genre, and it searches several open book collections at the same time,
-removes the duplicates, and hands back one merged, best-first list — where
-every book can be read legally for free.
+removes the duplicates, and hands back one merged, best-first list in
+which every book can be read legally for free.
 
 It is useful for:
 
@@ -25,7 +25,7 @@ It is useful for:
 - researchers looking for freely readable books on a topic; and
 - anyone tired of opening three or four catalog websites per question.
 
-Trafae needs no account. It does not host the books themselves — it points
+Trafae needs no account. It does not host the books themselves. It points
 to the collections that do, and every link it shows leads to a copy you can
 read at no cost.
 
@@ -53,7 +53,7 @@ each collection's popularity and rating evidence.
 
 ### 1. Search or browse
 
-Type a topic — "psychology", "cartography", "ancient Rome" — or browse a
+Type a topic ("psychology", "cartography", "ancient Rome") or browse a
 genre without typing anything at all. Either can be combined with filters:
 language, publication year range, a popularity floor, or a minimum rating.
 
@@ -69,42 +69,42 @@ which collections answered and which did not.
 ### 3. One merged list
 
 The same book found in several collections appears once, keeping every
-source's evidence — downloads, ratings, links. The rankings from the
-separate collections are then combined — a technique called
-[Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) — so
-that books several collections agree on rise to the top.
+source's evidence: downloads, ratings, links. The rankings from the
+separate collections are then combined using a technique called
+[Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114), so that
+books several collections agree on rise to the top.
 
 ### 4. Open and read
 
 Each result links to where the book can be read or downloaded. When a
-reader opens a book, an anonymous click is counted — the service's way of
+reader opens a book, an anonymous click is counted: the service's way of
 learning whether its recommendations are actually being read.
 
 ## Main features
 
-- **One search, many collections** — seven open book catalogs are searched
+- **One search, many collections:** seven open book catalogs are searched
   in parallel with a single question.
-- **Free and legal only** — every source offers books that can be read
-  immediately at no cost: public domain or open access.
-- **Merged, deduplicated results** — the same book from several catalogs
+- **Free and legal only:** every source offers books that can be read
+  immediately at no cost, whether public domain or open access.
+- **Merged, deduplicated results:** the same book from several catalogs
   collapses into one entry that keeps each source's ratings and popularity.
-- **Fair ranking** — each catalog's own best-first ordering is combined
+- **Fair ranking:** each catalog's own best-first ordering is combined
   into one list, so agreement across catalogs boosts a book without any
   single catalog dominating.
-- **Genre browsing** — browse history, science, psychology and more with no
+- **Genre browsing:** browse history, science, psychology and more with no
   search term at all; non-fiction is the default lens.
-- **Filters that mean what they say** — language, year range, popularity
+- **Filters that mean what they say:** language, year range, popularity
   floor, and rating floor are applied to the results you actually see.
-- **Transparent sources** — every card shows where a book came from, and
+- **Transparent sources:** every card shows where a book came from, and
   every search reports which collections answered.
-- **Fast repeats and page turns** — a recent search is remembered for a few
+- **Fast repeats and page turns:** a recent search is remembered for a few
   minutes, so revisiting it or flipping pages comes back instantly.
-- **Stable paging** — ordering does not shuffle between pages, and when the
+- **Stable paging:** ordering does not shuffle between pages, and when the
   collections have genuinely run out of books, the list says so instead of
   trailing off.
-- **Shareable searches** — the address captures the search and its filters,
+- **Shareable searches:** the address captures the search and its filters,
   so the back button works and a link shows a friend exactly what you saw.
-- **Degrades gracefully** — a blocked or slow collection costs you its own
+- **Degrades gracefully:** a blocked or slow collection costs you its own
   results, not the whole search.
 
 ## Where the books come from
@@ -127,7 +127,7 @@ and popularity or ratings are shown per source rather than silently blended.
 ### Combining the collections' opinions
 
 Each collection returns its own best-first list, but they score books in
-incompatible ways — one counts downloads, another uses star ratings, a
+incompatible ways: one counts downloads, another uses star ratings, a
 third just orders results. Trafae therefore compares *positions*, not
 scores: a book that appears near the top of any collection's list earns
 credit, and appearing high in several lists earns more. This technique,
@@ -139,7 +139,7 @@ even though the sources measure nothing alike.
 The same book often appears in three or four collections under slightly
 different records. Trafae recognizes it by its identifiers and by title and
 author, keeps one entry, and preserves every source's evidence alongside
-it — so "three catalogs agree" stays visible instead of being averaged
+it, so "three catalogs agree" stays visible instead of being averaged
 away.
 
 ### Evidence you can filter on
@@ -147,13 +147,13 @@ away.
 Download counts and star ratings are shown on the results and can be used
 as floors: "only books rated four stars or better", "only books many people
 have read". Publication year and language work the same way, and language
-spellings are understood generously — "english", "eng", and "en" all mean
+spellings are understood generously, so "english", "eng", and "en" all mean
 the same thing.
 
 ### Paging that stays fast
 
 When a reader asks for page three, Trafae quietly collects a deeper pool
-than it shows — a few extra pages' worth — sorts it once, hands out the
+than it shows, a few extra pages' worth, sorts it once, hands out the
 requested slice, and keeps the rest ready. The next page is then an instant
 slice of an answer already in hand, with the ordering exactly as it was.
 Only when a reader pages past that pool does Trafae fetch again, deeper.
@@ -173,7 +173,7 @@ browsing from drifting.
 Trafae has no accounts and stores no personal data. It counts two kinds of
 anonymous things: how many searches were made (and how many were answered
 from memory), and how many times a reader opened a book's read link. That
-last number — the share of searches that end in a book being opened — is
+last number, the share of searches that end in a book being opened, is
 the service's own measure of usefulness. All counters live in memory and
 reset when the service restarts.
 
@@ -190,15 +190,15 @@ reset when the service restarts.
   where a cover should be.
 - **Deep pages run dry.** Because collections cap how deep they can be
   asked, very deep result pages end earlier than an eager reader might
-  like — the trade-off for keeping ordering stable and honest.
+  like. That is the trade-off for keeping ordering stable and honest.
 
 ## References
 
 - Gordon V. Cormack, Charles L. A. Clarke, and Stefan Büttcher (2009).
   [Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning
   Methods](https://doi.org/10.1145/1571941.1572114). *SIGIR '09*,
-  pages 759–760 — the paper behind the ranking described in "How the
+  pages 759-760. The paper behind the ranking described in "How the
   ranking works".
 - Gregor Hohpe and Bobby Woolf (2003). [Scatter-Gather](https://www.enterpriseintegrationpatterns.com/patterns/messaging/BroadcastAggregate.html).
-  *Enterprise Integration Patterns* — the pattern named in "How it
+  *Enterprise Integration Patterns*. The pattern named in "How it
   works".

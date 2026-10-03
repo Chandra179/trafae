@@ -13,9 +13,13 @@ logger:
 
 middleware:
   request_log:
-    skip_paths: ["/health"]
+    skip_paths: ["/health", "/books/events"]
     log_query: true
     query_allowlist: ["topic", "genre", "provider", "min_year", "max_year", "language", "min_popularity", "min_rating", "limit", "page"]
+  rate_limit:
+    enabled: true
+    requests_per_second: 5
+    burst: 20
 
 sqlite:
   dsn: "trafae.db"
@@ -26,6 +30,7 @@ badger:
 books:
   default_genre: "non-fiction"
   default_limit: 20
+  cache_ttl_in_second: 300
 
 providers:
   open_library_contact_email: ""

@@ -15,6 +15,11 @@ import (
 // handlers.
 func (d *dependencies) New() *gin.Engine {
 	r := gin.New()
+	// No proxy is trusted, so client IPs come from the connection address:
+	// a spoofed X-Forwarded-For can neither rotate rate-limit buckets nor
+	// grow them. Deployments behind a known reverse proxy can add it back
+	// via SetTrustedProxies.
+	_ = r.SetTrustedProxies(nil)
 
 	middlewareChain := []gin.HandlerFunc{
 		gin.CustomRecovery(func(c *gin.Context, err any) {
@@ -50,12 +55,25 @@ func (d *dependencies) New() *gin.Engine {
 	if d.readiness != nil {
 		r.GET("/ready", d.readiness)
 	}
-	r.POST("/example", d.example)
+	if d.metrics != nil {
+		r.GET("/metrics", d.metrics)
+	}
+
+	// API routes carry the per-client rate limit; probes and metrics do not,
+	// so monitoring cannot be locked out by heavy search traffic.
+	api := r.Group("")
+	if d.rateLimit != nil {
+		api.Use(d.rateLimit)
+	}
+	api.POST("/example", d.example)
 	if d.bookSearch != nil {
-		r.GET("/books/search", d.bookSearch)
+		api.GET("/books/search", d.bookSearch)
 	}
 	if d.bookProviders != nil {
-		r.GET("/books/providers", d.bookProviders)
+		api.GET("/books/providers", d.bookProviders)
+	}
+	if d.bookEvent != nil {
+		api.POST("/books/events", d.bookEvent)
 	}
 
 	return r

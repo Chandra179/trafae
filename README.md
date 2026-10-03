@@ -62,8 +62,8 @@ curl "http://localhost:8080/books/search?genre=history&page=2&limit=24"
 make run
 ```
 
-The API listens on `http://localhost:8080`. Health and readiness probes are
-available at `/health` and `/ready`.
+The API listens on `http://localhost:8080`. Health, readiness, and funnel
+counters are available at `/health`, `/ready`, and `/metrics`.
 
 On startup the server syncs the official Project Gutenberg catalog (a gzipped
 CSV) into SQLite and refreshes it every 24 hours. Searches against it run
@@ -92,6 +92,13 @@ budget. The books search knobs:
 books:
   default_genre: "non-fiction"   # applied when the request omits genre
   default_limit: 20              # applied when the request omits limit (max 50)
+  cache_ttl_in_second: 300       # identical successful searches come from memory for this long (0 disables)
+
+middleware:
+  rate_limit:
+    enabled: true                # per-client throttle on the API routes
+    requests_per_second: 5
+    burst: 20
 
 providers:
   search_timeout_in_second: 30   # default per-provider context timeout
@@ -107,6 +114,28 @@ providers:
 
 SQLite is opened in WAL mode with a 10s busy timeout so reads keep serving
 while the catalog refresh writes.
+
+### Launch funnel & protection
+
+`GET /metrics` reports in-memory funnel counters — `searches_total`,
+`searches_cached_total`, per-provider `provider_status` outcomes,
+`access_clicks`, and `events_rejected_total`. They reset on restart and hold
+no personal data. The frontend posts a small
+`{"type":"access_click","provider":...}` beacon to `POST /books/events` when
+a reader opens a book's read link, so the search→read click-through rate —
+the launch success signal — is measurable end to end.
+
+API routes (`/books/*`, `/example`) are rate limited per client address; the
+probes and `/metrics` are exempt so monitoring cannot be locked out. Client
+IPs are taken from the connection address (trusted proxies are disabled), so
+a spoofed `X-Forwarded-For` cannot rotate limits. If you deploy behind a
+reverse proxy, configure gin's trusted proxies accordingly.
+
+The search cache serves identical successful requests from memory for
+`books.cache_ttl_in_second` (default 300s), which absorbs bursts without
+hammering rate-limited upstreams. Responses in which a provider errored are
+never cached, so the next request retries that provider; cached responses
+report the provider statuses observed when they were built.
 
 ### Frontend
 

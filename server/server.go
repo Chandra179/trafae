@@ -17,6 +17,7 @@ import (
 	"github.com/Chandra179/trafae/server/config"
 	"github.com/Chandra179/trafae/server/internal/books"
 	"github.com/Chandra179/trafae/server/internal/example"
+	"github.com/Chandra179/trafae/server/internal/metrics"
 	"github.com/Chandra179/trafae/server/internal/providers"
 	"github.com/Chandra179/trafae/server/logger"
 	"github.com/Chandra179/trafae/server/middleware"
@@ -92,6 +93,7 @@ func runHTTPServer() error {
 	for id, timeoutInSec := range cfg.Providers.SearchTimeoutsInSec {
 		searchTimeouts[id] = seconds(timeoutInSec)
 	}
+	appMetrics := metrics.New()
 	booksDeps := books.NewDependencies(&books.DependenciesConfig{
 		Logger:         log,
 		Providers:      providerDeps.All(),
@@ -99,17 +101,26 @@ func runHTTPServer() error {
 		DefaultLimit:   cfg.Books.DefaultLimit,
 		SearchTimeout:  seconds(cfg.Providers.SearchTimeoutInSec),
 		SearchTimeouts: searchTimeouts,
+		SearchCacheTTL: seconds(cfg.Books.CacheTTLInSec),
+		Metrics:        appMetrics,
 	})
 	middlewareDeps := middleware.NewDependencies(log)
 
+	var rateLimit gin.HandlerFunc
+	if cfg.Middleware.RateLimit.Enabled {
+		rateLimit = middleware.RateLimit(cfg.Middleware.RateLimit.RequestsPerSecond, cfg.Middleware.RateLimit.Burst)
+	}
 	engine := router.NewDependencies(&router.DependenciesConfig{
 		Logger:           log,
 		RequestLog:       middlewareDeps.RequestLog(cfg.Middleware.RequestLog),
 		RequestBodyLimit: middleware.RequestBodyLimit(cfg.HTTP.MaxBodySizeInBytes),
+		RateLimit:        rateLimit,
 		Readiness:        readinessHandler(db, badgerDB),
 		Example:          exampleDeps.HandleExample,
 		BookSearch:       booksDeps.HandleSearch,
 		BookProviders:    booksDeps.HandleProviders,
+		BookEvent:        appMetrics.EventHandler(),
+		Metrics:          appMetrics.Handler(),
 	}).New()
 
 	httpServer := &http.Server{

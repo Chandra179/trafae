@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/Chandra179/trafae/server/internal/metrics"
 )
 
 type DependenciesConfig struct {
@@ -16,6 +18,11 @@ type DependenciesConfig struct {
 	// provider capability ID.
 	SearchTimeout  time.Duration
 	SearchTimeouts map[string]time.Duration
+	// SearchCacheTTL serves identical successful searches from memory for
+	// that long; zero disables the cache.
+	SearchCacheTTL time.Duration
+	// Metrics receives the launch funnel counters; nil disables recording.
+	Metrics *metrics.Metrics
 }
 
 type dependencies struct {
@@ -26,6 +33,8 @@ type dependencies struct {
 	defaultLimit   int
 	searchTimeout  time.Duration
 	searchTimeouts map[string]time.Duration
+	cache          *searchCache
+	metrics        *metrics.Metrics
 }
 
 func NewDependencies(cfg *DependenciesConfig) *dependencies {
@@ -63,6 +72,8 @@ func NewDependencies(cfg *DependenciesConfig) *dependencies {
 		defaultLimit:   defaultLimit,
 		searchTimeout:  searchTimeout,
 		searchTimeouts: searchTimeouts,
+		cache:          newSearchCache(cfg.SearchCacheTTL),
+		metrics:        cfg.Metrics,
 	}
 	for _, provider := range deps.providers {
 		if provider == nil {

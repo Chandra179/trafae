@@ -29,6 +29,11 @@ func (d *dependencies) Capabilities() []ProviderCapability {
 
 func (d *dependencies) Search(ctx context.Context, request SearchRequest) (SearchResponse, error) {
 	request = d.normalizeRequest(request)
+	if response, ok := d.cache.get(request, time.Now()); ok {
+		d.metrics.RecordSearch(true)
+		return response, nil
+	}
+	d.metrics.RecordSearch(false)
 	response := SearchResponse{Results: []SearchResult{}, Providers: []ProviderStatus{}, Limit: request.Limit, Page: request.Page}
 	selected := d.selectedProviders(request.Providers)
 	if len(selected) == 0 {
@@ -103,6 +108,9 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 		response.Providers = append(response.Providers, status)
 	}
 	sort.Slice(response.Providers, func(i, j int) bool { return response.Providers[i].Provider < response.Providers[j].Provider })
+	for _, status := range response.Providers {
+		d.metrics.RecordProviderStatus(status.Provider, status.Status)
+	}
 	if providerSuccesses == 0 {
 		return response, errors.New("all eligible book providers failed")
 	}
@@ -127,6 +135,7 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 	}
 	response.HasMore = end < len(ordered)
 	response.Results = ordered[start:end]
+	d.cache.put(request, response, time.Now())
 	return response, nil
 }
 

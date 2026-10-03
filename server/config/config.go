@@ -25,6 +25,9 @@ type Config struct {
 type BooksConfig struct {
 	DefaultGenre string `yaml:"default_genre"`
 	DefaultLimit int    `yaml:"default_limit"`
+	// CacheTTLInSec serves identical successful searches from memory for this
+	// long; zero disables the cache.
+	CacheTTLInSec int `yaml:"cache_ttl_in_second"`
 }
 
 type ProvidersConfig struct {
@@ -45,12 +48,20 @@ type HTTPConfig struct {
 
 type MiddlewareConfig struct {
 	RequestLog RequestLogConfig `yaml:"request_log"`
+	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
 }
 
 type RequestLogConfig struct {
 	SkipPaths      []string `yaml:"skip_paths"`
 	QueryAllowlist []string `yaml:"query_allowlist"`
 	LogQuery       bool     `yaml:"log_query"`
+}
+
+// RateLimitConfig throttles API requests per client address.
+type RateLimitConfig struct {
+	Enabled           bool    `yaml:"enabled"`
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	Burst             int     `yaml:"burst"`
 }
 
 type LoggerConfig struct {
@@ -195,6 +206,17 @@ func (c Config) Validate() error {
 	}
 	if c.Middleware.RequestLog.LogQuery && len(c.Middleware.RequestLog.QueryAllowlist) == 0 {
 		problems = append(problems, "middleware.request_log.query_allowlist is required when log_query is enabled")
+	}
+	if c.Middleware.RateLimit.Enabled {
+		if c.Middleware.RateLimit.RequestsPerSecond <= 0 {
+			problems = append(problems, "middleware.rate_limit.requests_per_second must be greater than zero when enabled")
+		}
+		if c.Middleware.RateLimit.Burst < 1 {
+			problems = append(problems, "middleware.rate_limit.burst must be at least one when enabled")
+		}
+	}
+	if c.Books.CacheTTLInSec < 0 {
+		problems = append(problems, "books.cache_ttl_in_second must not be negative")
 	}
 
 	if len(problems) > 0 {

@@ -67,14 +67,37 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   `loading="lazy" decoding="async"`. (`web/src/components/book-card.tsx:41-46`)
   [#18](https://github.com/Chandra179/trafae/issues/18)
 
+## Launch readiness (2026-10-03)
+
+Work done for the launch-and-learn strategy (see
+`docs/discovery/2026-10-opportunity-frame.md`): real usage is the evidence
+channel, so the funnel is instrumented and the API is protected.
+
+- [x] **Search→read funnel metrics** — in-memory counters (`searches_total`,
+  `searches_cached_total`, per-provider `provider_status` outcomes,
+  `access_clicks`) served at `/metrics`; the backend accepts
+  `{"type":"access_click"}` beacons at `POST /books/events`. No personal data;
+  resets on restart. (`server/internal/metrics/`)
+- [x] **Per-client rate limiting** — `golang.org/x/time/rate` token buckets per
+  client address on the API routes (probes and `/metrics` exempt); trusted
+  proxies disabled so spoofed `X-Forwarded-For` cannot rotate buckets.
+  (`server/middleware/rate_limit.go`, `router/router.go`)
+- [x] **Short-TTL search cache** — identical successful searches are served
+  from memory for `books.cache_ttl_in_second` (300s default), capping upstream
+  fan-out on bursts; responses with an errored provider are never cached.
+  (`server/internal/books/search_cache.go`)
+- [x] **Schema migrations on boot** — see the #9 entry above.
+- [x] **Rename completed, dead Swagger route removed** — see #10 above.
+
 ## Testing & CI
 
 - [ ] 🟡 **Zero frontend tests** — no vitest, no test script; CI runs only lint/typecheck/build
   for `web/`. The URL-state machine in `home.tsx` is the most intricate logic in the app.
   [#15](https://github.com/Chandra179/trafae/issues/15)
-- [ ] 🟡 **Unpinned tool versions** — golangci-lint `version: v2` (floating), goose `@latest`,
-  and three different Go version references (`go.mod` 1.26.5 vs CI 1.27.0 vs Containerfile
-  `golang:1.27`). [#11](https://github.com/Chandra179/trafae/issues/11)
+- [ ] 🟡 **Unpinned tool versions** — golangci-lint `version: v2` (floating) and three different
+  Go version references (`go.mod` 1.26.5 vs CI 1.27.0 vs Containerfile `golang:1.27`).
+  The goose `@latest` part is fixed: migrations now run through `server/cmd/migrate` using
+  the goose library version pinned in `go.mod`. [#11](https://github.com/Chandra179/trafae/issues/11)
 
 ## Dead code & cleanup
 
@@ -111,8 +134,8 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 - **Gutendex occasionally times out** from some networks (observed once in testing); it has
   a 25s configured budget and recovers on retry.
 - **Deep pagination re-fetches and re-fuses the whole result pool on every page request** —
-  this is the price of stateless, stable RRF ordering. If it becomes hot, add a short-TTL
-  cache keyed by the normalized query.
+  this is the price of stateless, stable RRF ordering. Mitigated for identical requests by the
+  short-TTL search cache; distinct pages still re-fetch by design.
 - **Open Library sometimes serves blank/white cover images** that load successfully, so the
   `onError` gradient fallback cannot detect them.
 

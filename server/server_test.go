@@ -9,14 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type readinessStoreStub struct {
-	closed bool
-}
-
-func (s readinessStoreStub) IsClosed() bool {
-	return s.closed
-}
-
 func TestReadinessHandler(t *testing.T) {
 	t.Parallel()
 
@@ -26,28 +18,15 @@ func TestReadinessHandler(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	tests := []struct {
-		name       string
-		store      readinessStoreStub
-		wantStatus int
-	}{
-		{name: "ready", wantStatus: http.StatusOK},
-		{name: "badger closed", store: readinessStoreStub{closed: true}, wantStatus: http.StatusServiceUnavailable},
-	}
+	gin.SetMode(gin.TestMode)
+	response := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(response)
+	context.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-			response := httptest.NewRecorder()
-			context, _ := gin.CreateTestContext(response)
-			context.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
+	readinessHandler(db)(context)
 
-			readinessHandler(db, tt.store)(context)
-
-			if response.Code != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", response.Code, tt.wantStatus)
-			}
-		})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 }
 

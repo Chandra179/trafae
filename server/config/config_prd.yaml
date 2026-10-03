@@ -24,9 +24,6 @@ middleware:
 sqlite:
   dsn: ""
 
-badger:
-  dir: ""
-
 books:
   default_genre: "non-fiction"
   default_limit: 20

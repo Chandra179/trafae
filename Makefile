@@ -6,7 +6,6 @@ PODMAN ?= podman
 BINARY ?= bin/trafae-server
 APP_ENVIRONMENT ?= dev
 SQLITE_DSN ?= trafae.db
-BADGER_DIR ?= trafae
 
 .PHONY: all build run test lint fmt tidy verify migrate-up podman-build \
 	web-install web-dev web-build web-lint web-typecheck
@@ -18,7 +17,7 @@ build:
 	CGO_ENABLED=0 $(GO) build -trimpath -o "$(BINARY)" ./server/cmd/example
 
 run:
-	APP_ENVIRONMENT="$(APP_ENVIRONMENT)" SQLITE_DSN="$(SQLITE_DSN)" BADGER_DIR="$(BADGER_DIR)" $(GO) run ./server/cmd/example
+	APP_ENVIRONMENT="$(APP_ENVIRONMENT)" SQLITE_DSN="$(SQLITE_DSN)" $(GO) run ./server/cmd/example
 
 test:
 	$(GO) test -short -race -count=1 ./...

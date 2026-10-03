@@ -15,7 +15,6 @@ import (
 type Config struct {
 	Logger     LoggerConfig     `yaml:"logger"`
 	SQLite     SQLiteConfig     `yaml:"sqlite"`
-	Badger     BadgerConfig     `yaml:"badger"`
 	Middleware MiddlewareConfig `yaml:"middleware"`
 	HTTP       HTTPConfig       `yaml:"http"`
 	Books      BooksConfig      `yaml:"books"`
@@ -74,10 +73,6 @@ type SQLiteConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
-type BadgerConfig struct {
-	Dir string `yaml:"dir"`
-}
-
 // Environment returns the APP_ENVIRONMENT value, defaulting to dev.
 func Environment() string {
 	appEnvironment := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENVIRONMENT")))
@@ -125,9 +120,6 @@ func Load(path string) (*Config, error) {
 
 	if dsn, ok := os.LookupEnv("SQLITE_DSN"); ok {
 		cfg.SQLite.DSN = dsn
-	}
-	if dir, ok := os.LookupEnv("BADGER_DIR"); ok {
-		cfg.Badger.Dir = dir
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -200,9 +192,6 @@ func (c Config) Validate() error {
 
 	if strings.TrimSpace(c.SQLite.DSN) == "" {
 		problems = append(problems, "sqlite.dsn is required")
-	}
-	if strings.TrimSpace(c.Badger.Dir) == "" {
-		problems = append(problems, "badger.dir is required")
 	}
 	if c.Middleware.RequestLog.LogQuery && len(c.Middleware.RequestLog.QueryAllowlist) == 0 {
 		problems = append(problems, "middleware.request_log.query_allowlist is required when log_query is enabled")

@@ -80,8 +80,7 @@ make migrate-up   # runs server/cmd/migrate
 ### Configuration
 
 Configuration lives in `server/config/config_<APP_ENVIRONMENT>.yaml` (`dev` by
-default); `SQLITE_DSN` and `BADGER_DIR` can be overridden by environment
-variables. Each provider call is bounded by a context deadline — the shared
+default); `SQLITE_DSN` can be overridden by the `SQLITE_DSN` environment variable. Each provider call is bounded by a context deadline — the shared
 `search_timeout_in_second`, overridden per provider by
 `search_timeouts_in_second`. There is no separate HTTP-client timeout: those
 deadlines govern the whole upstream call, body read included. The daily

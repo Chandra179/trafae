@@ -26,7 +26,7 @@ func TestConfigValidateRejectsMissingRequiredValues(t *testing.T) {
 	if err == nil {
 		t.Fatal("Validate() returned nil for an invalid config")
 	}
-	for _, want := range []string{"sqlite.dsn is required", "badger.dir is required"} {
+	for _, want := range []string{"sqlite.dsn is required"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("Validate() error = %q, want %q", err, want)
 		}
@@ -49,15 +49,12 @@ logger:
   sampling_thereafter: 1
 sqlite:
   dsn: file.yaml
-badger:
-  dir: badger.yaml
 `)
 	if err := os.WriteFile(configPath, contents, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Setenv("SQLITE_DSN", "file.env")
-	t.Setenv("BADGER_DIR", "badger.env")
 
 	cfg, err := Load(configPath)
 	if err != nil {
@@ -65,9 +62,6 @@ badger:
 	}
 	if cfg.SQLite.DSN != "file.env" {
 		t.Errorf("SQLite.DSN = %q, want file.env", cfg.SQLite.DSN)
-	}
-	if cfg.Badger.Dir != "badger.env" {
-		t.Errorf("Badger.Dir = %q, want badger.env", cfg.Badger.Dir)
 	}
 }
 
@@ -87,8 +81,6 @@ logger:
   sampling_thereafter: 1
 sqlite:
   dsn: file.yaml
-badger:
-  dir: badger.yaml
 `)
 	if err := os.WriteFile(configPath, contents, 0o600); err != nil {
 		t.Fatal(err)
@@ -117,8 +109,6 @@ logger:
   sampling_thereafter: 1
 sqlite:
   dsn: file.yaml
-badger:
-  dir: badger.yaml
 unexpected: true
 `)
 	if err := os.WriteFile(configPath, contents, 0o600); err != nil {

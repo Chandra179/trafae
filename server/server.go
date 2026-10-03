@@ -68,12 +68,6 @@ func runHTTPServer() error {
 		return err
 	}
 
-	badgerDB, err := store.NewBadger(cfg.Badger.Dir)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = badgerDB.Close() }()
-
 	exampleDeps := example.NewDependencies(&example.DependenciesConfig{
 		Logger: log,
 		DB:     db,
@@ -116,7 +110,7 @@ func runHTTPServer() error {
 		RequestLog:       middlewareDeps.RequestLog(cfg.Middleware.RequestLog),
 		RequestBodyLimit: middleware.RequestBodyLimit(cfg.HTTP.MaxBodySizeInBytes),
 		RateLimit:        rateLimit,
-		Readiness:        readinessHandler(db, badgerDB),
+		Readiness:        readinessHandler(db),
 		Example:          exampleDeps.HandleExample,
 		BookSearch:       booksDeps.HandleSearch,
 		BookProviders:    booksDeps.HandleProviders,
@@ -157,13 +151,9 @@ func runHTTPServer() error {
 	}
 }
 
-type readinessStore interface {
-	IsClosed() bool
-}
-
-func readinessHandler(db *sql.DB, badgerDB readinessStore) gin.HandlerFunc {
+func readinessHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := db.PingContext(c.Request.Context()); err != nil || badgerDB.IsClosed() {
+		if err := db.PingContext(c.Request.Context()); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
 			return
 		}

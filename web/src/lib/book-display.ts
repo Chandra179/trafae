@@ -1,4 +1,4 @@
-import type { Book, ProviderStatus } from "@/api/books"
+import type { Book } from "@/api/books"
 
 export const GENRES = [
   "non-fiction",
@@ -67,9 +67,3 @@ export function licenseLabel(license: string) {
   return license.length > 24 ? `${license.slice(0, 24)}…` : license
 }
 
-export function providerSummary(providers: ProviderStatus[]) {
-  const ok = providers.filter((p) => p.status === "ok")
-  const skipped = providers.filter((p) => p.status === "skipped")
-  const failed = providers.filter((p) => p.status === "error")
-  return { ok, skipped, failed }
-}

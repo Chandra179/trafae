@@ -24,9 +24,6 @@ middleware:
 sqlite:
   dsn: "trafae.db"
 
-badger:
-  dir: "trafae"
-
 books:
   default_genre: "non-fiction"
   default_limit: 20

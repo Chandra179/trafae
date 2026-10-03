@@ -37,7 +37,22 @@ type FilterState = {
   maxYear: string
 }
 
-const emptyFilters: FilterState = { language: "", minRating: "", minYear: "", maxYear: "" }
+function filtersFromParams(searchParams: URLSearchParams): FilterState {
+  return {
+    language: searchParams.get("language") ?? "",
+    minRating: searchParams.get("min_rating") ?? "",
+    minYear: searchParams.get("min_year") ?? "",
+    maxYear: searchParams.get("max_year") ?? "",
+  }
+}
+
+function setOrDelete(params: URLSearchParams, key: string, value: string) {
+  if (value) {
+    params.set(key, value)
+  } else {
+    params.delete(key)
+  }
+}
 
 type LoadedSearch = {
   key: string
@@ -171,16 +186,21 @@ export function HomePage() {
   const requestKey = searchParams.toString()
   const searched = Boolean(topic) || searchParams.has("genre")
 
+  // The URL is the single source of truth: filters are read straight from it
+  // and every control mutates it, so paging, genre chips, and browser
+  // back/forward always agree. Only the topic box is staged (it commits on
+  // submit), and it re-syncs whenever the URL changes for a reason other than
+  // this component's own update — back/forward navigation in particular.
+  const filters = filtersFromParams(searchParams)
   const [topicInput, setTopicInput] = useState(topic)
-  const [filters, setFilters] = useState<FilterState>({
-    ...emptyFilters,
-    language: searchParams.get("language") ?? "",
-    minRating: searchParams.get("min_rating") ?? "",
-    minYear: searchParams.get("min_year") ?? "",
-    maxYear: searchParams.get("max_year") ?? "",
-  })
+  const lastPushedKey = useRef<string | null>(null)
   const [loaded, setLoaded] = useState<LoadedSearch>({ key: "" })
   const resultsRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (lastPushedKey.current !== null && requestKey === lastPushedKey.current) return
+    setTopicInput(searchParams.get("topic") ?? "")
+  }, [requestKey, searchParams])
 
   useEffect(() => {
     if (!searched) return
@@ -203,27 +223,54 @@ export function HomePage() {
     return () => controller.abort()
   }, [searched, topic, genre, page, requestKey, searchParams])
 
-  function runSearch(nextTopic: string, nextGenre: string, nextFilters: FilterState, explicitGenre = false) {
-    const params = new URLSearchParams()
-    if (nextTopic.trim()) params.set("topic", nextTopic.trim())
-    // A genre-chip click must always write the param: without it, a default-genre
-    // browse produces an empty URL and `searched` never turns true.
-    if (nextGenre !== "non-fiction" || explicitGenre) params.set("genre", nextGenre)
-    if (nextFilters.language) params.set("language", nextFilters.language)
-    if (nextFilters.minRating) params.set("min_rating", nextFilters.minRating)
-    if (nextFilters.minYear) params.set("min_year", nextFilters.minYear)
-    if (nextFilters.maxYear) params.set("max_year", nextFilters.maxYear)
+  function pushParams(mutate: (params: URLSearchParams) => void) {
+    const params = new URLSearchParams(searchParams)
+    mutate(params)
+    lastPushedKey.current = params.toString()
     setSearchParams(params)
   }
 
-  function changePage(next: number) {
-    const params = new URLSearchParams(searchParams)
-    if (next <= 1) {
+  // Committing a search replaces the topic and resets paging; the genre and
+  // filters in the URL are kept so refining a topic preserves the view.
+  function submitSearch() {
+    pushParams((params) => {
+      if (topicInput.trim()) {
+        params.set("topic", topicInput.trim())
+      } else {
+        params.delete("topic")
+      }
       params.delete("page")
-    } else {
-      params.set("page", String(next))
-    }
-    setSearchParams(params)
+    })
+  }
+
+  // A genre-chip click must always write the param: without it, a default-genre
+  // browse produces an empty URL and `searched` never turns true.
+  function browseGenre(nextGenre: string) {
+    pushParams((params) => {
+      params.set("genre", nextGenre)
+      params.delete("page")
+    })
+  }
+
+  // Filter edits apply immediately and jump back to page 1 of the refined view.
+  function applyFilters(next: FilterState) {
+    pushParams((params) => {
+      setOrDelete(params, "language", next.language)
+      setOrDelete(params, "min_rating", next.minRating)
+      setOrDelete(params, "min_year", next.minYear)
+      setOrDelete(params, "max_year", next.maxYear)
+      params.delete("page")
+    })
+  }
+
+  function changePage(next: number) {
+    pushParams((params) => {
+      if (next <= 1) {
+        params.delete("page")
+      } else {
+        params.set("page", String(next))
+      }
+    })
     resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
@@ -261,7 +308,7 @@ export function HomePage() {
           className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault()
-            runSearch(topicInput, genre, filters)
+            submitSearch()
           }}
         >
           <Input
@@ -280,7 +327,7 @@ export function HomePage() {
             <button
               className={chipClass(item === genre)}
               key={item}
-              onClick={() => runSearch(topicInput, item, filters, true)}
+              onClick={() => browseGenre(item)}
               type="button"
             >
               {genreLabel(item)}
@@ -289,7 +336,7 @@ export function HomePage() {
         </div>
 
         <div className="flex justify-center">
-          <Filters filters={filters} onChange={(next) => setFilters(next)} />
+          <Filters filters={filters} onChange={applyFilters} />
         </div>
 
         {!searched && (

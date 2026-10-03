@@ -33,8 +33,10 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   idempotent so pre-goose databases migrate cleanly; CI and `make migrate-up` run the same
   code path instead of `goose@latest`.
   (`store/migrate.go`, `server.go`, `project_gutenberg.go`, `cmd/migrate/`) [#9](https://github.com/Chandra179/trafae/issues/9)
-- [ ] 🟡 **Swagger UI route is dead** — `/swagger/*any` is mounted but no swag docs package is
-  generated or imported; README advertises it. (`router/router.go:55`) [#10](https://github.com/Chandra179/trafae/issues/10)
+- [x] 🟡 **Swagger UI route is dead** — `/swagger/*any` was mounted but no swag docs package was
+  generated or imported; the README advertised it. Fixed: route, swag annotations, and the
+  Vite proxy entry removed; `go mod tidy` dropped both swaggo dependencies.
+  (`router/router.go`) [#10](https://github.com/Chandra179/trafae/issues/10)
 - [x] 🟡 **Project Gutenberg feed refresh races the 18s client timeout** — full gzipped-CSV
   download streamed through the shared client. Fixed: the feed uses a dedicated client with
   a 10-minute budget. (`project_gutenberg.go:129`) [#8](https://github.com/Chandra179/trafae/issues/8)

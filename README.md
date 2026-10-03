@@ -62,8 +62,8 @@ curl "http://localhost:8080/books/search?genre=history&page=2&limit=24"
 make run
 ```
 
-The API listens on `http://localhost:8080`. Health, readiness, and Swagger are
-available at `/health`, `/ready`, and `/swagger/index.html`.
+The API listens on `http://localhost:8080`. Health and readiness probes are
+available at `/health` and `/ready`.
 
 On startup the server syncs the official Project Gutenberg catalog (a gzipped
 CSV) into SQLite and refreshes it every 24 hours. Searches against it run

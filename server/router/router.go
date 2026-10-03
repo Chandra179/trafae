@@ -6,15 +6,13 @@ import (
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
 	"github.com/Chandra179/trafae/server/middleware"
 )
 
-// New builds the Gin engine: middleware chain, health/swagger routes, and
-// module handlers.
+// New builds the Gin engine: middleware chain, health routes, and module
+// handlers.
 func (d *dependencies) New() *gin.Engine {
 	r := gin.New()
 
@@ -52,7 +50,6 @@ func (d *dependencies) New() *gin.Engine {
 	if d.readiness != nil {
 		r.GET("/ready", d.readiness)
 	}
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.POST("/example", d.example)
 	if d.bookSearch != nil {
 		r.GET("/books/search", d.bookSearch)

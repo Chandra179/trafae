@@ -46,7 +46,7 @@ func (p *projectGutenbergProvider) Search(ctx context.Context, request books.Sea
 	terms := queryTerms(request)
 	if len(terms) == 0 {
 		if strings.EqualFold(strings.ReplaceAll(request.Genre, "-", " "), "non fiction") {
-			terms = []string{"history", "science", "psychology", "philosophy", "biography", "economics", "business", "politics", "sociology", "education", "travel", "health", "technology", "religion"}
+			terms = append([]string(nil), books.DefaultGenreTopics...)
 		} else if strings.TrimSpace(request.Genre) != "" {
 			terms = []string{request.Genre}
 		} else {

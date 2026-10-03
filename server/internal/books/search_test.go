@@ -279,3 +279,44 @@ func TestGinSearchAndCapabilitiesHandlers(t *testing.T) {
 		}
 	}
 }
+
+func TestGenreMatchesUsesWholeWordPhrases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		subjects []string
+		genre    string
+		want     bool
+	}{
+		{"exact subject", []string{"History"}, "history", true},
+		{"phrase inside subject", []string{"Natural History"}, "history", true},
+		{"multi-word genre", []string{"Category: Science - Other"}, "science", true},
+		{"substring must not match", []string{"Prehistory", "Cartography"}, "history", false},
+		{"substring must not match art", []string{"Cartography"}, "art", false},
+		{"unrelated subject", []string{"Cooking"}, "psychology", false},
+		{"non-fiction keyword evidence", []string{"Science", "Physics"}, "non-fiction", true},
+		{"fiction excluded from non-fiction", []string{"Fiction", "Fantasy"}, "non-fiction", false},
+	}
+	for _, tc := range cases {
+		book := Book{Genres: tc.subjects}
+		if got := genreMatches(book, tc.genre); got != tc.want {
+			t.Errorf("%s: genreMatches(%v, %q) = %v, want %v", tc.name, tc.subjects, tc.genre, got, tc.want)
+		}
+	}
+}
+
+func TestDefaultGenreTopicsSharedWithProviders(t *testing.T) {
+	t.Parallel()
+
+	// The Project Gutenberg provider builds fallback search terms from this
+	// list; keeping it non-empty and lowercase is part of that contract.
+	if len(DefaultGenreTopics) == 0 {
+		t.Fatal("DefaultGenreTopics is empty")
+	}
+	for _, topic := range DefaultGenreTopics {
+		if topic != strings.ToLower(topic) || strings.TrimSpace(topic) == "" {
+			t.Errorf("topic %q must be a non-empty lowercase term", topic)
+		}
+	}
+}

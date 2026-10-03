@@ -262,12 +262,18 @@ func matchesRequest(book Book, request SearchRequest) bool {
 	return request.Genre == "" || genreMatches(book, request.Genre)
 }
 
+// DefaultGenreTopics lists the non-fiction genres the genre matcher accepts as
+// evidence that a book is non-fiction. The Project Gutenberg provider reuses
+// the same list as fallback search terms for default-genre browses, so the
+// two stay in sync.
+var DefaultGenreTopics = []string{"history", "science", "psychology", "philosophy", "biography", "economics", "business", "politics", "sociology", "education", "travel", "health", "technology", "religion"}
+
 func genreMatches(book Book, genre string) bool {
 	genre = normalized(genre)
 	candidates := append(append([]string(nil), book.Genres...), book.Subjects...)
 	for _, item := range candidates {
 		value := normalized(item)
-		if value == genre || strings.Contains(value, genre) || strings.Contains(genre, value) && value != "" {
+		if value == genre || containsPhrase(value, genre) {
 			return true
 		}
 	}
@@ -278,12 +284,37 @@ func genreMatches(book Book, genre string) bool {
 				return false
 			}
 		}
-		for _, term := range []string{"history", "science", "psychology", "philosophy", "biography", "economics", "business", "politics", "sociology", "education", "travel", "health", "technology", "religion"} {
+		for _, topic := range DefaultGenreTopics {
 			for _, item := range candidates {
-				if strings.Contains(normalized(item), term) {
+				if containsPhrase(normalized(item), topic) {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+// containsPhrase reports whether the words of phrase appear in order as whole
+// words in haystack. Substring matching over-matches — "art" matching
+// "cartography", "history" matching "prehistory" — so genre filtering compares
+// word sequences instead.
+func containsPhrase(haystack, phrase string) bool {
+	if phrase == "" {
+		return false
+	}
+	tokens := strings.Fields(haystack)
+	phraseTokens := strings.Fields(phrase)
+	for i := 0; i+len(phraseTokens) <= len(tokens); i++ {
+		matched := true
+		for j, word := range phraseTokens {
+			if tokens[i+j] != word {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
 		}
 	}
 	return false

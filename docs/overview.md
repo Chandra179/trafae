@@ -60,8 +60,9 @@ language, publication year range, a popularity floor, or a minimum rating.
 ### 2. Every collection at once
 
 The question goes out to all connected collections simultaneously, each
-with its own time budget. This is a pattern called scatter-gather: ask
-everyone at once, then gather whatever came back. A slow or unreachable
+with its own time budget. This is a pattern called
+[scatter-gather](https://www.enterpriseintegrationpatterns.com/patterns/messaging/BroadcastAggregate.html):
+ask everyone at once, then gather whatever came back. A slow or unreachable
 collection never holds the others hostage, and the page shows honestly
 which collections answered and which did not.
 
@@ -69,8 +70,9 @@ which collections answered and which did not.
 
 The same book found in several collections appears once, keeping every
 source's evidence — downloads, ratings, links. The rankings from the
-separate collections are then combined — a technique called Reciprocal
-Rank Fusion — so that books several collections agree on rise to the top.
+separate collections are then combined — a technique called
+[Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) — so
+that books several collections agree on rise to the top.
 
 ### 4. Open and read
 
@@ -189,3 +191,14 @@ reset when the service restarts.
 - **Deep pages run dry.** Because collections cap how deep they can be
   asked, very deep result pages end earlier than an eager reader might
   like — the trade-off for keeping ordering stable and honest.
+
+## References
+
+- Gordon V. Cormack, Charles L. A. Clarke, and Stefan Büttcher (2009).
+  [Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning
+  Methods](https://doi.org/10.1145/1571941.1572114). *SIGIR '09*,
+  pages 759–760 — the paper behind the ranking described in "How the
+  ranking works".
+- Gregor Hohpe and Bobby Woolf (2003). [Scatter-Gather](https://www.enterpriseintegrationpatterns.com/patterns/messaging/BroadcastAggregate.html).
+  *Enterprise Integration Patterns* — the pattern named in "How it
+  works".

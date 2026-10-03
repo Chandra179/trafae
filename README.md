@@ -159,6 +159,7 @@ Frontend checks:
 ```bash
 make web-lint
 make web-typecheck
+make web-test
 make web-build
 ```
 

@@ -8,7 +8,7 @@ APP_ENVIRONMENT ?= dev
 SQLITE_DSN ?= trafae.db
 
 .PHONY: all build run test lint fmt tidy verify migrate-up podman-build \
-	web-install web-dev web-build web-lint web-typecheck
+	web-install web-dev web-build web-lint web-typecheck web-test
 
 all: verify lint test build
 
@@ -54,3 +54,6 @@ web-lint:
 
 web-typecheck:
 	$(NPM) --prefix web run typecheck
+
+web-test:
+	$(NPM) --prefix web run test

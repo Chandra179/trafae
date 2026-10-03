@@ -76,9 +76,6 @@ func NewDependencies(cfg *DependenciesConfig) *dependencies {
 		metrics:        cfg.Metrics,
 	}
 	for _, provider := range deps.providers {
-		if provider == nil {
-			continue
-		}
 		id := strings.ToLower(strings.TrimSpace(provider.Capabilities().ID))
 		if id != "" {
 			deps.byID[id] = provider

@@ -44,7 +44,7 @@ func TestRequestIDReplacesInvalidHeader(t *testing.T) {
 	r.ServeHTTP(res, req)
 
 	id := res.Header().Get(headerKey)
-	if id == "" || len(id) != 32 || !validRequestID(id) {
-		t.Errorf("generated request ID = %q, want a 32-character safe ID", id)
+	if id == "" || len(id) > maxRequestIDLength || !validRequestID(id) {
+		t.Errorf("generated request ID = %q, want a fresh ID that passes validRequestID", id)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -46,17 +47,10 @@ func (d *dependencies) HandleSearch(c *gin.Context) {
 	})
 	if err != nil {
 		status := http.StatusServiceUnavailable
-		if len(result.Providers) > 0 {
-			allSkipped := true
-			for _, provider := range result.Providers {
-				if provider.Status != "skipped" {
-					allSkipped = false
-					break
-				}
-			}
-			if allSkipped {
-				status = http.StatusUnprocessableEntity
-			}
+		if len(result.Providers) > 0 && !slices.ContainsFunc(result.Providers, func(provider ProviderStatus) bool {
+			return provider.Status != "skipped"
+		}) {
+			status = http.StatusUnprocessableEntity
 		}
 		c.JSON(status, gin.H{"error": err.Error(), "providers": result.Providers})
 		return

@@ -2,10 +2,9 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -17,9 +16,7 @@ const headerKey = "X-Request-ID"
 const maxRequestIDLength = 128
 
 func generateRequestID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	return uuid.NewString()
 }
 
 func storeRequestID(ctx context.Context, id string) context.Context {

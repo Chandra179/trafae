@@ -327,3 +327,27 @@ func TestDefaultGenreTopicsSharedWithProviders(t *testing.T) {
 		}
 	}
 }
+
+func TestLanguageMatchesCanonicalizesLanguageValues(t *testing.T) {
+	t.Parallel()
+
+	matches := func(values []string, target string) bool { return languageMatches(values, target) }
+	if !matches([]string{"eng"}, "english") {
+		t.Error("spelling variants must match: eng vs english")
+	}
+	if !matches([]string{"English"}, "en") {
+		t.Error("matching must be case-insensitive")
+	}
+	if !matches([]string{"eng/ger"}, "de") || !matches([]string{"ger/eng"}, "de") {
+		t.Error("every token of a compound value must be compared, not just a suffix")
+	}
+	if !matches([]string{"sv"}, "sv") {
+		t.Error("unknown spellings must pass through and compare directly")
+	}
+	if matches([]string{"fre"}, "en") {
+		t.Error("different languages must not match")
+	}
+	if !matches([]string{"french"}, "fre") {
+		t.Error("a full value matching a variant of the target must match")
+	}
+}

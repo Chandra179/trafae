@@ -284,14 +284,13 @@ func escapeQuery(value string) string {
 	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(strings.TrimSpace(value))
 }
 
+// gutendexLanguage normalizes any accepted language spelling to its
+// two-letter code by delegating to the shared canonical map in books.
 func gutendexLanguage(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	for _, pair := range [][2]string{{"english", "en"}, {"eng", "en"}, {"french", "fr"}, {"fre", "fr"}, {"fra", "fr"}, {"german", "de"}, {"ger", "de"}, {"deu", "de"}, {"spanish", "es"}, {"spa", "es"}, {"italian", "it"}, {"ita", "it"}, {"portuguese", "pt"}, {"por", "pt"}} {
-		if value == pair[0] {
-			return pair[1]
-		}
+	if code := books.CanonicalLanguageCode(value); len(code) == 2 {
+		return code
 	}
-	return value
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func locLanguage(value string) string {

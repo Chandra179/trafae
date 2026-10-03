@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -19,9 +20,7 @@ const rrfK = 60
 func (d *dependencies) Capabilities() []ProviderCapability {
 	capabilities := make([]ProviderCapability, 0, len(d.providers))
 	for _, provider := range d.providers {
-		if provider != nil {
-			capabilities = append(capabilities, provider.Capabilities())
-		}
+		capabilities = append(capabilities, provider.Capabilities())
 	}
 	sort.Slice(capabilities, func(i, j int) bool { return capabilities[i].ID < capabilities[j].ID })
 	return capabilities
@@ -257,17 +256,12 @@ func matchesRequest(book Book, request SearchRequest) bool {
 	if request.MinRating != nil && (book.Rating == nil || book.Rating.Value < *request.MinRating) {
 		return false
 	}
-	if len(request.Topics) > 0 {
-		found := false
-		for _, topic := range request.Topics {
-			if containsTerm(book.Subjects, topic) || containsTerm(book.Genres, topic) || strings.Contains(strings.ToLower(book.Title), strings.ToLower(topic)) || strings.Contains(strings.ToLower(book.Description), strings.ToLower(topic)) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
+	if len(request.Topics) > 0 && !slices.ContainsFunc(request.Topics, func(topic string) bool {
+		return containsTerm(book.Subjects, topic) || containsTerm(book.Genres, topic) ||
+			strings.Contains(strings.ToLower(book.Title), strings.ToLower(topic)) ||
+			strings.Contains(strings.ToLower(book.Description), strings.ToLower(topic))
+	}) {
+		return false
 	}
 	return request.Genre == "" || genreMatches(book, request.Genre)
 }
@@ -281,53 +275,46 @@ var DefaultGenreTopics = []string{"history", "science", "psychology", "philosoph
 func genreMatches(book Book, genre string) bool {
 	genre = normalized(genre)
 	candidates := append(append([]string(nil), book.Genres...), book.Subjects...)
+	if containsAnyPhrase(candidates, []string{genre}) {
+		return true
+	}
+	if genre != "non fiction" && genre != "nonfiction" {
+		return false
+	}
+	// Any fiction mention without a "non" qualifier disqualifies the book,
+	// even when another subject supplies non-fiction evidence.
 	for _, item := range candidates {
 		value := normalized(item)
-		if value == genre || containsPhrase(value, genre) {
-			return true
+		if strings.Contains(value, "fiction") && !strings.Contains(value, "non fiction") && !strings.Contains(value, "nonfiction") {
+			return false
 		}
 	}
-	if genre == "non fiction" || genre == "nonfiction" {
-		for _, item := range candidates {
-			value := normalized(item)
-			if strings.Contains(value, "fiction") && !strings.Contains(value, "non fiction") && !strings.Contains(value, "nonfiction") {
-				return false
-			}
-		}
-		for _, topic := range DefaultGenreTopics {
-			for _, item := range candidates {
-				if containsPhrase(normalized(item), topic) {
-					return true
-				}
+	return containsAnyPhrase(candidates, DefaultGenreTopics)
+}
+
+// containsAnyPhrase reports whether any haystack contains any of the phrases
+// as whole words.
+func containsAnyPhrase(haystacks, phrases []string) bool {
+	for _, haystack := range haystacks {
+		value := normalized(haystack)
+		for _, phrase := range phrases {
+			if containsPhrase(value, phrase) {
+				return true
 			}
 		}
 	}
 	return false
 }
 
-// containsPhrase reports whether the words of phrase appear in order as whole
-// words in haystack. Substring matching over-matches — "art" matching
-// "cartography", "history" matching "prehistory" — so genre filtering compares
-// word sequences instead.
+// containsPhrase reports whether phrase appears in haystack as whole words.
+// Both sides are normalized (lowercase, single-space separated), so padding
+// each with spaces and substring-matching is exact whole-word matching —
+// "art" cannot match "cartography", "history" cannot match "prehistory".
 func containsPhrase(haystack, phrase string) bool {
 	if phrase == "" {
 		return false
 	}
-	tokens := strings.Fields(haystack)
-	phraseTokens := strings.Fields(phrase)
-	for i := 0; i+len(phraseTokens) <= len(tokens); i++ {
-		matched := true
-		for j, word := range phraseTokens {
-			if tokens[i+j] != word {
-				matched = false
-				break
-			}
-		}
-		if matched {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(" "+haystack+" ", " "+phrase+" ")
 }
 
 func dedupeKey(book Book) string {
@@ -388,30 +375,43 @@ func mergeBookMetadata(destination *Book, incoming Book) {
 	}
 }
 
+// CanonicalLanguageCode collapses accepted language spellings to one code, so
+// "eng", "english" and "en" compare equal without listing every pair.
+// Unknown spellings pass through lowercased. Providers reuse this so the
+// language knowledge lives in exactly one place.
+func CanonicalLanguageCode(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if canonical, ok := languageCanonical[value]; ok {
+		return canonical
+	}
+	return value
+}
+
+var languageCanonical = map[string]string{
+	"en": "en", "eng": "en", "english": "en",
+	"fr": "fr", "fre": "fr", "fra": "fr", "french": "fr",
+	"de": "de", "ger": "de", "deu": "de", "german": "de",
+	"es": "es", "spa": "es", "spanish": "es",
+	"it": "it", "ita": "it", "italian": "it",
+	"pt": "pt", "por": "pt", "portuguese": "pt",
+}
+
+// languageMatches reports whether one of the book's language values matches
+// the requested language. Values may be compound ("fre/ger"), so every
+// separator-delimited token is compared in canonical form.
 func languageMatches(values []string, target string) bool {
-	target = strings.ToLower(strings.TrimSpace(target))
-	canonical := map[string][]string{
-		"en": {"en", "eng", "english"}, "eng": {"en", "eng", "english"}, "english": {"en", "eng", "english"},
-		"fr": {"fr", "fre", "fra", "french"}, "fre": {"fr", "fre", "fra", "french"}, "fra": {"fr", "fre", "fra", "french"}, "french": {"fr", "fre", "fra", "french"},
-		"de": {"de", "ger", "deu", "german"}, "ger": {"de", "ger", "deu", "german"}, "deu": {"de", "ger", "deu", "german"}, "german": {"de", "ger", "deu", "german"},
-		"es": {"es", "spa", "spanish"}, "spa": {"es", "spa", "spanish"}, "spanish": {"es", "spa", "spanish"},
-		"it": {"it", "ita", "italian"}, "ita": {"it", "ita", "italian"}, "italian": {"it", "ita", "italian"},
-		"pt": {"pt", "por", "portuguese"}, "por": {"pt", "por", "portuguese"}, "portuguese": {"pt", "por", "portuguese"},
-	}
-	targets := canonical[target]
-	if len(targets) == 0 {
-		targets = []string{target}
-	}
+	target = CanonicalLanguageCode(target)
 	for _, value := range values {
-		value = strings.ToLower(strings.TrimSpace(value))
-		for _, candidate := range targets {
-			if value == candidate || strings.HasSuffix(value, "/"+candidate) || strings.HasSuffix(value, ":"+candidate) {
+		for _, token := range strings.FieldsFunc(strings.ToLower(value), isLanguageSeparator) {
+			if CanonicalLanguageCode(token) == target {
 				return true
 			}
 		}
 	}
 	return false
 }
+
+func isLanguageSeparator(r rune) bool { return r == '/' || r == ':' }
 
 func containsTerm(values []string, target string) bool {
 	target = strings.ToLower(strings.TrimSpace(target))

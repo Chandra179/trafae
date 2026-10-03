@@ -50,7 +50,7 @@ func newSearchCache(ttl time.Duration) *searchCache {
 // to serve the requested page. Callers must treat the pool and statuses as
 // read-only: they are shared between requests and marshaled concurrently.
 func (c *searchCache) get(request SearchRequest, now time.Time) (searchCacheEntry, bool) {
-	if c == nil || c.ttl <= 0 {
+	if c.ttl <= 0 {
 		return searchCacheEntry{}, false
 	}
 	c.mu.Lock()
@@ -73,7 +73,7 @@ func (c *searchCache) get(request SearchRequest, now time.Time) (searchCacheEntr
 // that built it and are frozen until the entry expires; a fully failed search
 // returns an error before it gets here and is never cached.
 func (c *searchCache) put(request SearchRequest, pool []SearchResult, providers []ProviderStatus, fetchLimit int, now time.Time) {
-	if c == nil || c.ttl <= 0 {
+	if c.ttl <= 0 {
 		return
 	}
 	c.mu.Lock()

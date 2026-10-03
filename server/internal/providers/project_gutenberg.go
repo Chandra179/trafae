@@ -17,16 +17,25 @@ import (
 	"github.com/Chandra179/lux/server/internal/books"
 )
 
+// gutenbergFeedTimeout bounds the daily catalog download. The feed is a large
+// gzipped CSV streamed over possibly slow links, so it cannot run inside the
+// short per-search budgets; it gets a dedicated HTTP client for the same
+// reason.
+const gutenbergFeedTimeout = 10 * time.Minute
+
 type projectGutenbergProvider struct {
 	db          *sql.DB
-	client      *http.Client
+	feedClient  *http.Client
 	feedURL     string
 	initMu      sync.Mutex
 	schemaReady bool
 }
 
-func newProjectGutenbergProvider(db *sql.DB, client *http.Client, feedURL string) *projectGutenbergProvider {
-	return &projectGutenbergProvider{db: db, client: client, feedURL: feedURL}
+func newProjectGutenbergProvider(db *sql.DB, feedClient *http.Client, feedURL string) *projectGutenbergProvider {
+	if feedClient == nil {
+		feedClient = &http.Client{Timeout: gutenbergFeedTimeout}
+	}
+	return &projectGutenbergProvider{db: db, feedClient: feedClient, feedURL: feedURL}
 }
 
 func (p *projectGutenbergProvider) Capabilities() books.ProviderCapability {
@@ -126,7 +135,7 @@ func (p *projectGutenbergProvider) refresh(ctx context.Context) error {
 	request.Header.Set("Accept", "text/csv, application/gzip, application/octet-stream")
 	request.Header.Set("Accept-Encoding", "identity")
 	request.Header.Set("User-Agent", "TrafaeBookDiscovery/1.0")
-	response, err := p.client.Do(request)
+	response, err := p.feedClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("request Project Gutenberg catalog: %w", err)
 	}

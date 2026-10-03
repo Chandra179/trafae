@@ -3,13 +3,14 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/Chandra179/lux/server/internal/books"
 )
@@ -176,11 +177,70 @@ func withLimit(request books.SearchRequest, max int) int {
 	return limit
 }
 
+// defaultClient returns the client for provider API calls. It carries no
+// client-level Timeout: http.Client.Timeout covers reading the response body,
+// so it would silently cap the per-provider context deadlines configured in
+// providers.search_timeouts_in_second. Every search call runs under such a
+// deadline already; long downloads (the Gutenberg catalog feed) use their own
+// client.
 func defaultClient(client *http.Client) *http.Client {
 	if client != nil {
 		return client
 	}
-	return &http.Client{Timeout: 18 * time.Second}
+	return &http.Client{}
+}
+
+// termConcurrency bounds the per-topic upstream fan-out inside one provider
+// call; topics beyond the bound queue behind an in-flight one.
+const termConcurrency = 4
+
+// searchTerms runs one upstream query per term, up to termConcurrency at a
+// time, and returns per-term results and errors in term order. A failing term
+// does not abort the others: its error is collected so callers can serve the
+// results that did succeed instead of dropping the provider entirely.
+func searchTerms(ctx context.Context, terms []string, search func(context.Context, string) ([]books.Book, error)) ([][]books.Book, []error) {
+	bookResults := make([][]books.Book, len(terms))
+	errResults := make([]error, len(terms))
+	workers := termConcurrency
+	if workers > len(terms) {
+		workers = len(terms)
+	}
+	indices := make(chan int)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for index := range indices {
+				bookResults[index], errResults[index] = search(ctx, terms[index])
+			}
+		}()
+	}
+	for index := range terms {
+		indices <- index
+	}
+	close(indices)
+	wg.Wait()
+	return bookResults, errResults
+}
+
+// termFailure summarizes per-term errors: nil when every term succeeded, the
+// single error when one failed, and a count-carrying joined error otherwise.
+func termFailure(errs []error) error {
+	failed := make([]error, 0, len(errs))
+	for _, err := range errs {
+		if err != nil {
+			failed = append(failed, err)
+		}
+	}
+	switch len(failed) {
+	case 0:
+		return nil
+	case 1:
+		return failed[0]
+	default:
+		return fmt.Errorf("%d topic requests failed: %w", len(failed), errors.Join(failed...))
+	}
 }
 
 func addUnique(values []string, value string) []string {

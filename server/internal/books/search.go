@@ -81,36 +81,24 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 		case result.skipped != "":
 			status.Status = "skipped"
 			status.Reason = result.skipped
-		case result.err != nil:
+		case result.err != nil && len(result.books) == 0:
 			status.Status = "error"
 			status.Reason = result.err.Error()
 			d.logger.Warn("book provider search failed", zap.String("provider", result.capability.ID), zap.Error(result.err))
+		case result.err != nil:
+			// The provider served some topic results before one upstream
+			// request failed; keep the partial set and surface the failure.
+			status.Status = "partial"
+			status.Reason = result.err.Error()
+			status.Count = len(result.books)
+			providerSuccesses++
+			d.logger.Warn("book provider returned partial results", zap.String("provider", result.capability.ID), zap.Error(result.err))
+			mergeProviderBooks(result.books, request, result.capability.ID, merged)
 		default:
 			status.Status = "ok"
 			providerSuccesses++
 			status.Count = len(result.books)
-			for rank, book := range result.books {
-				if !matchesRequest(book, request) {
-					continue
-				}
-				key := dedupeKey(book)
-				if key == "" {
-					key = result.capability.ID + ":" + normalized(book.ID)
-				}
-				entry, exists := merged[key]
-				if !exists {
-					entry = &SearchResult{Book: book, Sources: []BookSource{}, RRFScore: 0}
-					merged[key] = entry
-				}
-				entry.RRFScore += 1 / float64(rrfK+rank+1)
-				if !sourcePresent(entry.Sources, book.Source.Provider, book.Source.ID) {
-					source := book.Source
-					source.Popularity = book.Popularity
-					source.Rating = book.Rating
-					entry.Sources = append(entry.Sources, source)
-				}
-				mergeBookMetadata(&entry.Book, book)
-			}
+			mergeProviderBooks(result.books, request, result.capability.ID, merged)
 		}
 		response.Providers = append(response.Providers, status)
 	}
@@ -140,6 +128,33 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 	response.HasMore = end < len(ordered)
 	response.Results = ordered[start:end]
 	return response, nil
+}
+
+// mergeProviderBooks folds one provider's ranked results into the fusion pool,
+// scoring each book by its rank and collapsing duplicates across providers.
+func mergeProviderBooks(providerBooks []Book, request SearchRequest, providerID string, merged map[string]*SearchResult) {
+	for rank, book := range providerBooks {
+		if !matchesRequest(book, request) {
+			continue
+		}
+		key := dedupeKey(book)
+		if key == "" {
+			key = providerID + ":" + normalized(book.ID)
+		}
+		entry, exists := merged[key]
+		if !exists {
+			entry = &SearchResult{Book: book, Sources: []BookSource{}, RRFScore: 0}
+			merged[key] = entry
+		}
+		entry.RRFScore += 1 / float64(rrfK+rank+1)
+		if !sourcePresent(entry.Sources, book.Source.Provider, book.Source.ID) {
+			source := book.Source
+			source.Popularity = book.Popularity
+			source.Rating = book.Rating
+			entry.Sources = append(entry.Sources, source)
+		}
+		mergeBookMetadata(&entry.Book, book)
+	}
 }
 
 // searchTimeoutFor returns the configured call budget for one provider,

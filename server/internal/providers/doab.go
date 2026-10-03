@@ -28,55 +28,66 @@ func (p *doabProvider) Search(ctx context.Context, request books.SearchRequest) 
 	if len(terms) == 0 {
 		terms = []string{""}
 	}
+	termResults, termErrs := searchTerms(ctx, terms, func(ctx context.Context, term string) ([]books.Book, error) {
+		return p.searchTerm(ctx, request, term)
+	})
 	var found bookAccumulator
-	for _, term := range terms {
-		values := url.Values{}
-		if term != "" {
-			values.Set("query", term)
-		}
-		values.Set("size", fmt.Sprint(withLimit(request, 100)))
-		values.Set("page", "0")
-		var response struct {
-			Embedded struct {
-				SearchResult struct {
-					Embedded struct {
-						Objects []struct {
-							Embedded struct {
-								IndexableObject struct {
-									UUID     string             `json:"uuid"`
-									Handle   string             `json:"handle"`
-									Name     string             `json:"name"`
-									Metadata doabMetadataValues `json:"metadata"`
-								} `json:"indexableObject"`
-							} `json:"_embedded"`
-						} `json:"objects"`
-					} `json:"_embedded"`
-				} `json:"searchResult"`
-			} `json:"_embedded"`
-		}
-		if err := requestJSON(ctx, p.client, p.endpoint, values, "TrafaeBookDiscovery/1.0", &response); err != nil {
-			return nil, err
-		}
-		for _, object := range response.Embedded.SearchResult.Embedded.Objects {
-			item := object.Embedded.IndexableObject
-			metadata := item.Metadata.normalized()
-			title := firstString(metadata.first("dc.title"), item.Name)
-			if title == "" {
-				continue
-			}
-			id := firstString(item.UUID, item.Handle)
-			subjects := metadata.all("dc.subject")
-			book := books.Book{ID: id, Title: title, Authors: metadata.all("dc.contributor.author", "dc.creator"),
-				Description: metadata.first("dc.description.abstract", "dc.description"), Subjects: subjects,
-				Genres:    append([]string{"non-fiction"}, subjects...),
-				Languages: metadata.all("dc.language.iso", "dc.language"), ISBNs: metadata.all("dc.identifier.isbn"),
-				License: firstString(metadata.first("dc.rights.uri"), metadata.first("dc.rights"), "Open Access")}
-			book.Year = parseYear(metadata.first("dc.date.issued"))
-			book.YearKind = "publication_year"
-			book.URL = firstString(metadata.first("dc.identifier.uri"), doabHandleURL(item.Handle), doabItemURL(item.UUID))
-			book.Source = books.BookSource{Provider: "doab", ID: id, URL: book.URL}
+	for _, termBooks := range termResults {
+		for _, book := range termBooks {
 			found.add(book)
 		}
+	}
+	return found.all(), termFailure(termErrs)
+}
+
+func (p *doabProvider) searchTerm(ctx context.Context, request books.SearchRequest, term string) ([]books.Book, error) {
+	values := url.Values{}
+	if term != "" {
+		values.Set("query", term)
+	}
+	values.Set("size", fmt.Sprint(withLimit(request, 100)))
+	values.Set("page", "0")
+	var response struct {
+		Embedded struct {
+			SearchResult struct {
+				Embedded struct {
+					Objects []struct {
+						Embedded struct {
+							IndexableObject struct {
+								UUID     string             `json:"uuid"`
+								Handle   string             `json:"handle"`
+								Name     string             `json:"name"`
+								Metadata doabMetadataValues `json:"metadata"`
+							} `json:"indexableObject"`
+						} `json:"_embedded"`
+					} `json:"objects"`
+				} `json:"_embedded"`
+			} `json:"searchResult"`
+		} `json:"_embedded"`
+	}
+	if err := requestJSON(ctx, p.client, p.endpoint, values, "TrafaeBookDiscovery/1.0", &response); err != nil {
+		return nil, err
+	}
+	var found bookAccumulator
+	for _, object := range response.Embedded.SearchResult.Embedded.Objects {
+		item := object.Embedded.IndexableObject
+		metadata := item.Metadata.normalized()
+		title := firstString(metadata.first("dc.title"), item.Name)
+		if title == "" {
+			continue
+		}
+		id := firstString(item.UUID, item.Handle)
+		subjects := metadata.all("dc.subject")
+		book := books.Book{ID: id, Title: title, Authors: metadata.all("dc.contributor.author", "dc.creator"),
+			Description: metadata.first("dc.description.abstract", "dc.description"), Subjects: subjects,
+			Genres:    append([]string{"non-fiction"}, subjects...),
+			Languages: metadata.all("dc.language.iso", "dc.language"), ISBNs: metadata.all("dc.identifier.isbn"),
+			License: firstString(metadata.first("dc.rights.uri"), metadata.first("dc.rights"), "Open Access")}
+		book.Year = parseYear(metadata.first("dc.date.issued"))
+		book.YearKind = "publication_year"
+		book.URL = firstString(metadata.first("dc.identifier.uri"), doabHandleURL(item.Handle), doabItemURL(item.UUID))
+		book.Source = books.BookSource{Provider: "doab", ID: id, URL: book.URL}
+		found.add(book)
 	}
 	return found.all(), nil
 }

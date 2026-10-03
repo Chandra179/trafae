@@ -39,17 +39,16 @@ func (p *wikidataProvider) Search(ctx context.Context, request books.SearchReque
 	if len(terms) == 0 {
 		terms = append(terms, request.Genre)
 	}
+	termResults, termErrs := searchTerms(ctx, terms, func(ctx context.Context, term string) ([]books.Book, error) {
+		return p.searchTerm(ctx, request, term)
+	})
 	var found bookAccumulator
-	for _, term := range terms {
-		books, err := p.searchTerm(ctx, request, term)
-		if err != nil {
-			return nil, err
-		}
-		for _, book := range books {
+	for _, termBooks := range termResults {
+		for _, book := range termBooks {
 			found.add(book)
 		}
 	}
-	return found.all(), nil
+	return found.all(), termFailure(termErrs)
 }
 
 func (p *wikidataProvider) searchTerm(ctx context.Context, request books.SearchRequest, term string) ([]books.Book, error) {

@@ -103,9 +103,13 @@ type SearchResult struct {
 
 type ProviderStatus struct {
 	Provider string `json:"provider"`
-	Status   string `json:"status"`
-	Reason   string `json:"reason,omitempty"`
-	Count    int    `json:"count,omitempty"`
+	// Status is one of "ok", "partial" (some topic results succeeded before a
+	// request failed), "skipped", or "error".
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+	// Count is always serialized so clients can tell a successful search that
+	// matched zero books apart from a missing count.
+	Count int `json:"count"`
 }
 
 type SearchResponse struct {

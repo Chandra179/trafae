@@ -28,62 +28,72 @@ func (p *gutendexProvider) Search(ctx context.Context, request books.SearchReque
 	if len(terms) == 0 {
 		terms = []string{""}
 	}
+	termResults, termErrs := searchTerms(ctx, terms, func(ctx context.Context, term string) ([]books.Book, error) {
+		return p.searchTerm(ctx, request, term)
+	})
+	var found bookAccumulator
+	for _, termBooks := range termResults {
+		for _, book := range termBooks {
+			found.add(book)
+		}
+	}
+	return found.all(), termFailure(termErrs)
+}
+
+func (p *gutendexProvider) searchTerm(ctx context.Context, request books.SearchRequest, term string) ([]books.Book, error) {
 	var found bookAccumulator
 	target := withLimit(request, 200)
 	maxPages := 8
-	for _, term := range terms {
-		values := url.Values{}
-		if term != "" {
-			values.Set("topic", term)
+	values := url.Values{}
+	if term != "" {
+		values.Set("topic", term)
+	}
+	values.Set("sort", "popular")
+	if request.Language != "" {
+		values.Set("languages", gutendexLanguage(request.Language))
+	}
+	pageURL := p.endpoint + "?" + values.Encode()
+	for page, collected := 0, 0; page < maxPages && collected < target; page++ {
+		var response struct {
+			Next    string `json:"next"`
+			Results []struct {
+				ID      int    `json:"id"`
+				Title   string `json:"title"`
+				Authors []struct {
+					Name string `json:"name"`
+				} `json:"authors"`
+				Summaries     []string          `json:"summaries"`
+				Subjects      []string          `json:"subjects"`
+				Bookshelves   []string          `json:"bookshelves"`
+				Languages     []string          `json:"languages"`
+				DownloadCount int64             `json:"download_count"`
+				Formats       map[string]string `json:"formats"`
+			} `json:"results"`
 		}
-		values.Set("sort", "popular")
-		if request.Language != "" {
-			values.Set("languages", gutendexLanguage(request.Language))
+		if err := requestJSON(ctx, p.client, pageURL, nil, "TrafaeBookDiscovery/1.0", &response); err != nil {
+			return nil, err
 		}
-		pageURL := p.endpoint + "?" + values.Encode()
-		collected := 0
-		for page := 0; page < maxPages && collected < target; page++ {
-			var response struct {
-				Next    string `json:"next"`
-				Results []struct {
-					ID      int    `json:"id"`
-					Title   string `json:"title"`
-					Authors []struct {
-						Name string `json:"name"`
-					} `json:"authors"`
-					Summaries     []string          `json:"summaries"`
-					Subjects      []string          `json:"subjects"`
-					Bookshelves   []string          `json:"bookshelves"`
-					Languages     []string          `json:"languages"`
-					DownloadCount int64             `json:"download_count"`
-					Formats       map[string]string `json:"formats"`
-				} `json:"results"`
+		for _, item := range response.Results {
+			book := books.Book{ID: fmt.Sprint(item.ID), Title: item.Title, Subjects: append(item.Subjects, item.Bookshelves...), Languages: item.Languages,
+				Popularity: &books.Metric{Value: float64(item.DownloadCount), Metric: "downloads"}, URL: fmt.Sprintf("https://www.gutenberg.org/ebooks/%d", item.ID)}
+			for _, author := range item.Authors {
+				book.Authors = append(book.Authors, author.Name)
 			}
-			if err := requestJSON(ctx, p.client, pageURL, nil, "TrafaeBookDiscovery/1.0", &response); err != nil {
-				return nil, err
+			if len(item.Summaries) > 0 {
+				book.Description = item.Summaries[0]
 			}
-			for _, item := range response.Results {
-				book := books.Book{ID: fmt.Sprint(item.ID), Title: item.Title, Subjects: append(item.Subjects, item.Bookshelves...), Languages: item.Languages,
-					Popularity: &books.Metric{Value: float64(item.DownloadCount), Metric: "downloads"}, URL: fmt.Sprintf("https://www.gutenberg.org/ebooks/%d", item.ID)}
-				for _, author := range item.Authors {
-					book.Authors = append(book.Authors, author.Name)
-				}
-				if len(item.Summaries) > 0 {
-					book.Description = item.Summaries[0]
-				}
-				book.Genres = append([]string(nil), book.Subjects...)
-				book.AccessURLs = formatURLs(item.Formats)
-				book.Source = books.BookSource{Provider: "gutendex", ID: book.ID, URL: book.URL}
-				if found.add(book) {
-					collected++
-				}
+			book.Genres = append([]string(nil), book.Subjects...)
+			book.AccessURLs = formatURLs(item.Formats)
+			book.Source = books.BookSource{Provider: "gutendex", ID: book.ID, URL: book.URL}
+			if found.add(book) {
+				collected++
 			}
-			nextURL := safeNextURL(p.endpoint, response.Next)
-			if nextURL == "" {
-				break
-			}
-			pageURL = nextURL
 		}
+		nextURL := safeNextURL(p.endpoint, response.Next)
+		if nextURL == "" {
+			break
+		}
+		pageURL = nextURL
 	}
 	return found.all(), nil
 }

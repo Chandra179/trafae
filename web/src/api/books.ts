@@ -47,7 +47,7 @@ export type SearchResult = {
 
 export type ProviderStatus = {
   provider: string
-  status: "ok" | "skipped" | "error"
+  status: "ok" | "partial" | "skipped" | "error"
   reason?: string
   count?: number
 }

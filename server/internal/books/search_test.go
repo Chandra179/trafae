@@ -98,6 +98,39 @@ func TestSearchReturnsPartialResultsWhenProviderFails(t *testing.T) {
 	}
 }
 
+func TestSearchMarksPartiallyFailedProviderAndKeepsItsResults(t *testing.T) {
+	partial := &stubProvider{
+		capability: ProviderCapability{ID: "gutendex", Filters: []string{FilterTopics, FilterGenre}},
+		books:      []Book{discoveryBook("gutendex", "1", 100)},
+		err:        errors.New("one topic request failed: gutendex.test returned HTTP 500"),
+	}
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{partial}})
+	response, err := service.Search(context.Background(), SearchRequest{Topics: []string{"biology"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Results) != 1 {
+		t.Fatalf("results = %d, want the partial provider's books kept", len(response.Results))
+	}
+	status := response.Providers[0]
+	if status.Status != "partial" || status.Count != 1 {
+		t.Fatalf("status = %#v, want partial with count 1", status)
+	}
+	if !strings.Contains(status.Reason, "failed") {
+		t.Fatalf("reason = %q, want the underlying failure", status.Reason)
+	}
+}
+
+func TestProviderStatusAlwaysSerializesCount(t *testing.T) {
+	raw, err := json.Marshal(ProviderStatus{Provider: "gutendex", Status: "ok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"count":0`) {
+		t.Fatalf("provider status = %s, want count serialized even when zero", raw)
+	}
+}
+
 func TestSearchReturnsErrorWhenNoProviderCanServeRequest(t *testing.T) {
 	provider := &stubProvider{capability: ProviderCapability{ID: "doab", Filters: []string{FilterTopics, FilterGenre}}}
 	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}})

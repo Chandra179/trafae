@@ -7,14 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Chandra179/lux/server/internal/books"
 	"go.uber.org/zap"
+
+	"github.com/Chandra179/lux/server/internal/books"
 )
 
 type DependenciesConfig struct {
-	Logger                   *zap.Logger
-	DB                       *sql.DB
-	HTTPClient               *http.Client
+	Logger     *zap.Logger
+	DB         *sql.DB
+	HTTPClient *http.Client
+	// GutenbergFeedClient downloads the daily catalog feed; when nil a
+	// dedicated client with a long timeout is built, since the download is
+	// far larger than any per-search call.
+	GutenbergFeedClient      *http.Client
 	OpenLibraryEmail         string
 	OpenLibraryBaseURL       string
 	DOABBaseURL              string
@@ -48,7 +53,11 @@ func NewDependencies(cfg *DependenciesConfig) *dependencies {
 	loc := newLibraryOfCongressProvider(client, baseOr(cfg.LibraryOfCongressBaseURL, "https://www.loc.gov/books/"))
 	var pg *projectGutenbergProvider
 	if cfg.DB != nil {
-		pg = newProjectGutenbergProvider(cfg.DB, client, baseOr(cfg.GutenbergCatalogURL, "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"))
+		feedClient := cfg.GutenbergFeedClient
+		if feedClient == nil {
+			feedClient = &http.Client{Timeout: gutenbergFeedTimeout}
+		}
+		pg = newProjectGutenbergProvider(cfg.DB, feedClient, baseOr(cfg.GutenbergCatalogURL, "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"))
 	}
 	wikidata := newWikidataProvider(client, baseOr(cfg.WikidataBaseURL, "https://www.wikidata.org/w/api.php"))
 	providers := []books.Provider{openLibrary, doab, gutendex, internetArchive, loc, wikidata}

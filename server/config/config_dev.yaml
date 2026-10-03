@@ -28,7 +28,6 @@ books:
   default_limit: 20
 
 providers:
-  http_timeout_in_second: 18
   open_library_contact_email: ""
   gutenberg_catalog_url: "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"
   search_timeout_in_second: 30

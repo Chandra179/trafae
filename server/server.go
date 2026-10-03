@@ -76,10 +76,14 @@ func runHTTPServer() error {
 		Logger: log,
 		DB:     db,
 	})
+	// Provider calls are bounded by the per-provider context deadlines from
+	// providers.search_timeouts_in_second, not by a client-level Timeout —
+	// http.Client.Timeout also covers reading the body, so it would silently
+	// cap those configured budgets.
 	providerDeps := providers.NewDependencies(&providers.DependenciesConfig{
 		Logger:              log,
 		DB:                  db,
-		HTTPClient:          &http.Client{Timeout: seconds(cfg.Providers.HTTPTimeoutInSec)},
+		HTTPClient:          &http.Client{},
 		OpenLibraryEmail:    cfg.Providers.OpenLibraryContactEmail,
 		GutenbergCatalogURL: cfg.Providers.GutenbergCatalogURL,
 	})

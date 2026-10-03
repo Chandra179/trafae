@@ -79,7 +79,12 @@ make migrate-up
 
 Configuration lives in `server/config/config_<APP_ENVIRONMENT>.yaml` (`dev` by
 default); `SQLITE_DSN` and `BADGER_DIR` can be overridden by environment
-variables. The books search knobs:
+variables. Each provider call is bounded by a context deadline — the shared
+`search_timeout_in_second`, overridden per provider by
+`search_timeouts_in_second`. There is no separate HTTP-client timeout: those
+deadlines govern the whole upstream call, body read included. The daily
+Project Gutenberg catalog download uses its own client with a 10-minute
+budget. The books search knobs:
 
 ```yaml
 books:
@@ -87,7 +92,6 @@ books:
   default_limit: 20              # applied when the request omits limit (max 50)
 
 providers:
-  http_timeout_in_second: 18     # shared HTTP client timeout for provider APIs
   search_timeout_in_second: 30   # default per-provider context timeout
   search_timeouts_in_second:     # per-provider overrides of that timeout
     open_library: 20

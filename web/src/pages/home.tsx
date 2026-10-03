@@ -47,14 +47,20 @@ type LoadedSearch = {
 
 function ProviderChip({ status }: { status: ProviderStatus }) {
   const label = providerLabel(status.provider)
-  if (status.status === "ok") {
+  if (status.status === "ok" || status.status === "partial") {
+    const partial = status.status === "partial"
     return (
       <span
         className="inline-flex items-center gap-1.5 rounded border border-border bg-card px-2.5 py-1 font-sans text-xs text-foreground"
-        title={`${label} returned ${status.count} books`}
+        title={
+          partial
+            ? `${label} returned ${status.count ?? 0} books (partial: ${status.reason ?? "some requests failed"})`
+            : `${label} returned ${status.count ?? 0} books`
+        }
       >
-        <span className="size-[7px] rounded-full bg-primary" />
-        {label} <span className="font-semibold">{status.count}</span>
+        <span className={`size-[7px] rounded-full ${partial ? "bg-[#c9b98a]" : "bg-primary"}`} />
+        {label} <span className="font-semibold">{status.count ?? 0}</span>
+        {partial && " partial"}
       </span>
     )
   }
@@ -298,7 +304,7 @@ export function HomePage() {
           {providerStatuses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3.5">
               <span className="mr-1 font-sans text-[13px] text-muted-foreground">
-                Searched {providerStatuses.filter((p) => p.status === "ok").length} of{" "}
+                Searched {providerStatuses.filter((p) => p.status === "ok" || p.status === "partial").length} of{" "}
                 {providerStatuses.length} catalogs:
               </span>
               {providerStatuses.map((status) => (

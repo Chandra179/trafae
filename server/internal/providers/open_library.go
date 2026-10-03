@@ -39,62 +39,66 @@ func (p *openLibraryProvider) Search(ctx context.Context, request books.SearchRe
 	if len(terms) == 0 {
 		terms = []string{"non-fiction"}
 	}
+	termResults, termErrs := searchTerms(ctx, terms, func(ctx context.Context, term string) ([]books.Book, error) {
+		return p.searchTerm(ctx, request, term)
+	})
 	var found bookAccumulator
-	for _, term := range terms {
-		limit := withLimit(request, 100)
-		cacheKey := strings.ToLower(term) + ":" + fmt.Sprint(limit)
-		if cached, ok := p.cached(cacheKey); ok {
-			for _, book := range cached {
-				found.add(book)
-			}
-			continue
-		}
-		if err := p.wait(ctx); err != nil {
-			return nil, err
-		}
-		values := url.Values{}
-		values.Set("subject", term)
-		values.Set("limit", fmt.Sprint(limit))
-		values.Set("fields", "key,title,author_name,first_publish_year,subject,isbn,ratings_average,ratings_count,cover_i,language,edition_count")
-		var response struct {
-			Docs []map[string]any `json:"docs"`
-		}
-		userAgent := "TrafaeBookDiscovery/1.0"
-		if p.email != "" {
-			userAgent += " (" + p.email + ")"
-		}
-		if err := requestJSON(ctx, p.client, p.baseURL+"/search.json", values, userAgent, &response); err != nil {
-			return nil, err
-		}
-		var termBooks bookAccumulator
-		for _, doc := range response.Docs {
-			book := books.Book{
-				ID: stringValue(doc["key"]), Title: stringValue(doc["title"]),
-				Authors: stringValues(doc["author_name"]), Subjects: stringValues(doc["subject"]),
-				Languages: stringValues(doc["language"]), ISBNs: stringValues(doc["isbn"]),
-				URL: openLibraryURL(stringValue(doc["key"])),
-			}
-			book.Genres = append([]string(nil), book.Subjects...)
-			book.Year = parseYear(doc["first_publish_year"])
-			book.YearKind = "first_publication_year"
-			if coverID, ok := number(doc["cover_i"]); ok {
-				book.CoverURL = fmt.Sprintf("https://covers.openlibrary.org/b/id/%.0f-M.jpg", coverID)
-			}
-			if rating, ok := number(doc["ratings_average"]); ok {
-				count, _ := number(doc["ratings_count"])
-				book.Rating = &books.Rating{Value: rating, Scale: 5, Count: int(count)}
-			}
-			book.Source = books.BookSource{Provider: "open_library", ID: book.ID, URL: book.URL}
-			if book.Title != "" {
-				termBooks.add(book)
-			}
-		}
-		p.cacheBooks(cacheKey, termBooks.all())
-		for _, book := range termBooks.all() {
+	for _, termBooks := range termResults {
+		for _, book := range termBooks {
 			found.add(book)
 		}
 	}
-	return found.all(), nil
+	return found.all(), termFailure(termErrs)
+}
+
+func (p *openLibraryProvider) searchTerm(ctx context.Context, request books.SearchRequest, term string) ([]books.Book, error) {
+	limit := withLimit(request, 100)
+	cacheKey := strings.ToLower(term) + ":" + fmt.Sprint(limit)
+	if cached, ok := p.cached(cacheKey); ok {
+		return cached, nil
+	}
+	if err := p.wait(ctx); err != nil {
+		return nil, err
+	}
+	values := url.Values{}
+	values.Set("subject", term)
+	values.Set("limit", fmt.Sprint(limit))
+	values.Set("fields", "key,title,author_name,first_publish_year,subject,isbn,ratings_average,ratings_count,cover_i,language,edition_count")
+	var response struct {
+		Docs []map[string]any `json:"docs"`
+	}
+	userAgent := "TrafaeBookDiscovery/1.0"
+	if p.email != "" {
+		userAgent += " (" + p.email + ")"
+	}
+	if err := requestJSON(ctx, p.client, p.baseURL+"/search.json", values, userAgent, &response); err != nil {
+		return nil, err
+	}
+	var termBooks bookAccumulator
+	for _, doc := range response.Docs {
+		book := books.Book{
+			ID: stringValue(doc["key"]), Title: stringValue(doc["title"]),
+			Authors: stringValues(doc["author_name"]), Subjects: stringValues(doc["subject"]),
+			Languages: stringValues(doc["language"]), ISBNs: stringValues(doc["isbn"]),
+			URL: openLibraryURL(stringValue(doc["key"])),
+		}
+		book.Genres = append([]string(nil), book.Subjects...)
+		book.Year = parseYear(doc["first_publish_year"])
+		book.YearKind = "first_publication_year"
+		if coverID, ok := number(doc["cover_i"]); ok {
+			book.CoverURL = fmt.Sprintf("https://covers.openlibrary.org/b/id/%.0f-M.jpg", coverID)
+		}
+		if rating, ok := number(doc["ratings_average"]); ok {
+			count, _ := number(doc["ratings_count"])
+			book.Rating = &books.Rating{Value: rating, Scale: 5, Count: int(count)}
+		}
+		book.Source = books.BookSource{Provider: "open_library", ID: book.ID, URL: book.URL}
+		if book.Title != "" {
+			termBooks.add(book)
+		}
+	}
+	p.cacheBooks(cacheKey, termBooks.all())
+	return termBooks.all(), nil
 }
 
 func (p *openLibraryProvider) cached(key string) ([]books.Book, bool) {

@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/Chandra179/lux/server/internal/books"
-	_ "modernc.org/sqlite"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -78,9 +82,12 @@ func TestGutendexSearchesEveryTopic(t *testing.T) {
 		items = append(items, fmt.Sprintf(`{"id":%d,"title":"Book %d","authors":[{"name":"Ada Author"}]}`, i, i))
 	}
 	body := `{"next":null,"results":[` + strings.Join(items, ",") + `]}`
+	var mu sync.Mutex
 	var topics []string
 	client := fakeClient(t, func(r *http.Request) string {
+		mu.Lock()
 		topics = append(topics, r.URL.Query().Get("topic"))
+		mu.Unlock()
 		return body
 	})
 	provider := newGutendexProvider(client, "https://gutendex.test/books")
@@ -90,11 +97,56 @@ func TestGutendexSearchesEveryTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(topics) != 2 || topics[0] != "biology" || topics[1] != "history" {
-		t.Fatalf("upstream topics = %v, want one request per topic", topics)
+	mu.Lock()
+	collected := append([]string(nil), topics...)
+	mu.Unlock()
+	sort.Strings(collected)
+	if len(collected) != 2 || collected[0] != "biology" || collected[1] != "history" {
+		t.Fatalf("upstream topics = %v, want one request per topic", collected)
 	}
 	if len(results) != 30 {
 		t.Fatalf("results = %d, want 30", len(results))
+	}
+}
+
+func TestGutendexSearchesTopicsConcurrently(t *testing.T) {
+	secondStarted := make(chan struct{})
+	client := fakeClient(t, func(r *http.Request) string {
+		if r.URL.Query().Get("topic") == "history" {
+			close(secondStarted)
+			return `{"next":null,"results":[]}`
+		}
+		select {
+		case <-secondStarted:
+		case <-time.After(2 * time.Second):
+			t.Error("second topic did not start before the first finished; per-topic requests look sequential")
+		}
+		return `{"next":null,"results":[]}`
+	})
+	provider := newGutendexProvider(client, "https://gutendex.test/books")
+	request := providerRequest()
+	request.Topics = []string{"biology", "history"}
+	if _, err := provider.Search(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGutendexKeepsPartialResultsWhenOneTopicFails(t *testing.T) {
+	client := responseClient(func(request *http.Request) *http.Response {
+		if request.URL.Query().Get("topic") == "history" {
+			return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}")), Request: request}
+		}
+		return jsonResponse(request, `{"next":null,"results":[{"id":42,"title":"Biology","authors":[{"name":"Ada Author"}]}]}`)
+	})
+	provider := newGutendexProvider(client, "https://gutendex.test/books")
+	request := providerRequest()
+	request.Topics = []string{"biology", "history"}
+	results, err := provider.Search(context.Background(), request)
+	if err == nil {
+		t.Fatal("Search() returned nil error when a topic request failed")
+	}
+	if len(results) != 1 || results[0].Title != "Biology" {
+		t.Fatalf("results = %#v, want the successful topic's books alongside the error", results)
 	}
 }
 
@@ -187,6 +239,20 @@ func TestWikidataSearchMapsEntities(t *testing.T) {
 	}
 	if book.Source.Provider != "wikidata" || book.URL != "https://www.wikidata.org/wiki/Q1" {
 		t.Fatalf("unexpected source: %#v", book.Source)
+	}
+}
+
+func TestDefaultProviderClientHasNoTimeoutCap(t *testing.T) {
+	client := defaultClient(nil)
+	if client.Timeout != 0 {
+		t.Fatalf("default client timeout = %v, want 0; per-provider context deadlines must govern instead", client.Timeout)
+	}
+}
+
+func TestProjectGutenbergFeedClientDefaultsToLongTimeout(t *testing.T) {
+	provider := newProjectGutenbergProvider(nil, nil, "https://gutenberg.test/catalog.csv.gz")
+	if provider.feedClient == nil || provider.feedClient.Timeout != gutenbergFeedTimeout {
+		t.Fatalf("feed client timeout = %v, want %v (the catalog download must not share the search budgets)", provider.feedClient, gutenbergFeedTimeout)
 	}
 }
 

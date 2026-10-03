@@ -27,7 +27,6 @@ type BooksConfig struct {
 }
 
 type ProvidersConfig struct {
-	HTTPTimeoutInSec        int            `yaml:"http_timeout_in_second"`
 	OpenLibraryContactEmail string         `yaml:"open_library_contact_email"`
 	GutenbergCatalogURL     string         `yaml:"gutenberg_catalog_url"`
 	SearchTimeoutInSec      int            `yaml:"search_timeout_in_second"`
@@ -86,9 +85,6 @@ func Load(path string) (*Config, error) {
 	if cfg.Books.DefaultLimit == 0 {
 		cfg.Books.DefaultLimit = books.DefaultResultLimit
 	}
-	if cfg.Providers.HTTPTimeoutInSec == 0 {
-		cfg.Providers.HTTPTimeoutInSec = 18
-	}
 	if strings.TrimSpace(cfg.Providers.GutenbergCatalogURL) == "" {
 		cfg.Providers.GutenbergCatalogURL = "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz"
 	}
@@ -145,9 +141,6 @@ func (c Config) Validate() error {
 	}
 	if c.Books.DefaultLimit <= 0 || c.Books.DefaultLimit > 50 {
 		problems = append(problems, "books.default_limit must be between 1 and 50")
-	}
-	if c.Providers.HTTPTimeoutInSec <= 0 {
-		problems = append(problems, "providers.http_timeout_in_second must be greater than zero")
 	}
 	if c.Providers.SearchTimeoutInSec <= 0 {
 		problems = append(problems, "providers.search_timeout_in_second must be greater than zero")

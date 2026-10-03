@@ -6,14 +6,21 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 
 ## Bugs
 
+- [x] 🟡 **Provider chip hides the count when a catalog returns 0 books** — `count` had
+  `omitempty`, so a successful zero-result search rendered "undefined" in the chip tooltip.
+  Fixed: `count` is always serialized and the chip falls back to `?? 0`; also renders the
+  new `partial` status. (`server/internal/books/types.go:105`, `web/src/pages/home.tsx`) [#19](https://github.com/Chandra179/trafae/issues/19)
 - [x] 🔴 **Gutendex drops every topic after the first** — the page-walk loop condition uses
   the accumulator shared across all topic terms, so term 1 fills it and terms 2..8 never
   execute. (`server/internal/providers/gutendex.go:44`) [#3](https://github.com/Chandra179/trafae/issues/3)
-- [ ] 🔴 **Shared http.Client timeout caps per-provider timeouts** — client `Timeout: 18s`
+- [x] 🔴 **Shared http.Client timeout caps per-provider timeouts** — client `Timeout: 18s`
   includes body read, so the configured 25–30s provider budgets can never be reached.
-  (`server/server.go:82`, `config.go:89-91`, `provider_utils.go:183`) [#4](https://github.com/Chandra179/trafae/issues/4)
-- [ ] 🟡 **One failed upstream request discards all of a provider's results** — every
+  Fixed: no client-level timeout; per-provider context deadlines govern, and the now-dead
+  `http_timeout_in_second` knob was removed from config. (`server/server.go:82`, `config.go:89-91`, `provider_utils.go:183`) [#4](https://github.com/Chandra179/trafae/issues/4)
+- [x] 🟡 **One failed upstream request discards all of a provider's results** — every
   sequential provider returns `nil, err` mid-loop instead of returning partial results.
+  Fixed: per-term errors are collected (`searchTerms`/`termFailure`); a provider now returns
+  its partial books, and the fusion layer reports a new `partial` provider status.
   (`open_library.go:66`, `doab.go:57`, `library_of_congress.go:48`, `internet_archive.go:50`,
   `gutendex.go:61`, `wikidata.go:44`) [#6](https://github.com/Chandra179/trafae/issues/6)
 - [ ] 🟡 **Language filter declared but never sent upstream** by Open Library, DOAB, Internet
@@ -24,8 +31,9 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
   (`project_gutenberg.go:214-234`) [#9](https://github.com/Chandra179/trafae/issues/9)
 - [ ] 🟡 **Swagger UI route is dead** — `/swagger/*any` is mounted but no swag docs package is
   generated or imported; README advertises it. (`router/router.go:55`) [#10](https://github.com/Chandra179/trafae/issues/10)
-- [ ] 🟡 **Project Gutenberg feed refresh races the 18s client timeout** — full gzipped-CSV
-  download streamed through the shared client. (`project_gutenberg.go:129`) [#8](https://github.com/Chandra179/trafae/issues/8)
+- [x] 🟡 **Project Gutenberg feed refresh races the 18s client timeout** — full gzipped-CSV
+  download streamed through the shared client. Fixed: the feed uses a dedicated client with
+  a 10-minute budget. (`project_gutenberg.go:129`) [#8](https://github.com/Chandra179/trafae/issues/8)
 - [x] 🟡 **"Non-fiction (all)" chip can never start a search** — `runSearch` omits the default
   genre from the URL while `searched` requires topic or genre param.
   (`web/src/pages/home.tsx:199,162`) [#12](https://github.com/Chandra179/trafae/issues/12)
@@ -41,9 +49,11 @@ Legend: 🔴 high · 🟡 medium · ⚪ low.
 
 ## Performance
 
-- [ ] 🔴 **Per-topic upstream requests run sequentially inside one provider call** — worst case
+- [x] 🔴 **Per-topic upstream requests run sequentially inside one provider call** — worst case
   8 topics ⇒ Open Library alone issues 8 sequential requests plus ~7s of rate-limit sleeps,
   all inside a single provider context; gutendex walks up to 8 pages per term.
+  Fixed: per-term requests fan out with a bounded concurrency of 4 (`searchTerms`); Open
+  Library's rate limiter still spaces request starts.
   (`open_library.go:43-96`, `doab.go:32-80`, `library_of_congress.go:32-65`,
   `internet_archive.go:31-73`, `gutendex.go:32-84`, `wikidata.go:43-51`)
   [#5](https://github.com/Chandra179/trafae/issues/5)

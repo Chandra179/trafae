@@ -16,15 +16,16 @@ const searchCacheMaxEntries = 512
 // into upstream 403s and timeouts. The cache is deliberately tiny: a fixed
 // entry cap, TTL expiry, and no invalidation.
 type searchCache struct {
-	mu      sync.Mutex
 	entries map[string]searchCacheEntry
+	mu      sync.Mutex
 	ttl     time.Duration
 }
 
+// searchCacheEntry keeps the expiry as raw nanoseconds: with a uniform TTL,
+// expiry order is insertion order, so eviction needs no second timestamp.
 type searchCacheEntry struct {
-	response   SearchResponse
-	insertedAt time.Time
-	expiresAt  time.Time
+	response  SearchResponse
+	expiresAt int64
 }
 
 func newSearchCache(ttl time.Duration) *searchCache {
@@ -44,7 +45,7 @@ func (c *searchCache) get(request SearchRequest, now time.Time) (SearchResponse,
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[cacheKey(request)]
-	if !ok || !now.Before(entry.expiresAt) {
+	if !ok || now.UnixNano() >= entry.expiresAt {
 		return SearchResponse{}, false
 	}
 	return entry.response, true
@@ -63,15 +64,14 @@ func (c *searchCache) put(request SearchRequest, response SearchResponse, now ti
 		c.evictLocked(now)
 	}
 	c.entries[cacheKey(request)] = searchCacheEntry{
-		response:   response,
-		insertedAt: now,
-		expiresAt:  now.Add(c.ttl),
+		response:  response,
+		expiresAt: now.Add(c.ttl).UnixNano(),
 	}
 }
 
 func (c *searchCache) evictLocked(now time.Time) {
 	for key, entry := range c.entries {
-		if !now.Before(entry.expiresAt) {
+		if now.UnixNano() >= entry.expiresAt {
 			delete(c.entries, key)
 		}
 	}
@@ -79,10 +79,10 @@ func (c *searchCache) evictLocked(now time.Time) {
 		return
 	}
 	var oldestKey string
-	var oldest time.Time
+	var oldestExpiry int64
 	for key, entry := range c.entries {
-		if oldest.IsZero() || entry.insertedAt.Before(oldest) {
-			oldestKey, oldest = key, entry.insertedAt
+		if oldestKey == "" || entry.expiresAt < oldestExpiry {
+			oldestKey, oldestExpiry = key, entry.expiresAt
 		}
 	}
 	if oldestKey != "" {

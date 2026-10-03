@@ -63,7 +63,8 @@ func runHTTPServer() error {
 
 	// The schema must exist before providers and handlers touch the database;
 	// applying it here makes a fresh deployment searchable with no extra step.
-	if err := store.Migrate(ctx, db); err != nil {
+	err = store.Migrate(ctx, db)
+	if err != nil {
 		return err
 	}
 

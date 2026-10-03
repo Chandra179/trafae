@@ -18,13 +18,12 @@ const unknownProvider = "unknown"
 
 // Metrics is safe for concurrent use by handlers and services.
 type Metrics struct {
+	providerStatus map[string]map[string]*atomic.Int64
+	providerClicks map[string]map[string]*atomic.Int64
+	mu             sync.Mutex
 	searches       atomic.Int64
 	searchesCached atomic.Int64
 	eventsRejected atomic.Int64
-
-	mu             sync.Mutex
-	providerStatus map[string]map[string]*atomic.Int64
-	providerClicks map[string]map[string]*atomic.Int64
 }
 
 func New() *Metrics {

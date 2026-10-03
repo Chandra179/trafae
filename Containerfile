@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/trafae-server ./server/cmd/example
 
-FROM docker.io/library/alpine:3.22
+FROM docker.io/library/alpine:3.24
 
 RUN addgroup -S trafae \
     && adduser -S -G trafae trafae \

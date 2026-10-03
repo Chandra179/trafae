@@ -137,6 +137,24 @@ succeeded is cached; a fully failed search is never cached. Cached responses
 report the provider statuses observed when they were built, and the TTL is
 when the next request retries every provider.
 
+### Known provider limitations
+
+- **DOAB** returns HTTP 403 from some deployment networks ("Your address is
+  not allowed to access this API") — their API gate blocks client IPs. The
+  provider uses DOAB's current DSpace 7 discover API; re-test from another
+  network before assuming a code problem.
+- **loc.gov** returns HTTP 403 (Cloudflare "Just a moment" challenge) for
+  datacenter IPs; browser-like User-Agents do not help. May work from other
+  networks.
+- **Gutendex** occasionally times out from some networks; it has a 25s
+  configured budget and recovers on retry.
+- **Deep pagination** re-fetches and re-fuses the whole result pool on every
+  page request — the price of stateless, stable RRF ordering. Identical
+  requests are served from the short-TTL cache; distinct pages still re-fetch
+  by design.
+- **Open Library** sometimes serves blank/white cover images that load
+  successfully, so the frontend's broken-image fallback cannot detect them.
+
 ### Frontend
 
 Install dependencies and start Vite:

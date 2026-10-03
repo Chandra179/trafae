@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -93,5 +94,31 @@ func TestNilMetricsIsNoop(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `"searches_total":0`) {
 		t.Errorf("nil metrics snapshot %s should be all zeros", data)
+	}
+}
+
+func TestRecordSearchDurationBuckets(t *testing.T) {
+	t.Parallel()
+
+	m := New()
+	m.RecordSearchDuration(50 * time.Millisecond)
+	m.RecordSearchDuration(50 * time.Millisecond)
+	m.RecordSearchDuration(300 * time.Millisecond)
+	m.RecordSearchDuration(30 * time.Second)
+
+	data, err := json.Marshal(m.Snapshot())
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := string(data)
+	for _, want := range []string{
+		`"100":2`,
+		`"250":0`,
+		`"500":1`,
+		`"inf":1`,
+	} {
+		if !strings.Contains(snapshot, want) {
+			t.Errorf("snapshot %s missing %s", snapshot, want)
+		}
 	}
 }

@@ -18,9 +18,15 @@ Every parameter is optional: search by topic (`topic`, repeatable), browse by
 topic is given), or combine both with the filters below.
 
 Paging is stateless: pass `page` (1-based, default 1) alongside `limit` (page
-size). Each request re-fetches enough from every provider to serve page N and
-slices the fused ranking, so ordering stays stable across pages; the response
-reports `page` and `has_more`.
+size). A page-N request fetches the requested page plus a few pages of
+lookahead from every provider, fuses and sorts that pool, slices it, and
+caches the pool for `books.cache_ttl_in_second` — page navigation within the
+cached pool is served from memory in milliseconds with zero upstream calls,
+and ordering stays stable across pages. Requests deeper than the cached pool
+re-fetch with fresh lookahead. Providers cap their fetch depth (Open Library,
+DOAB and loc.gov at 100 results; Internet Archive, Gutendex and Project
+Gutenberg at 200), so very deep pages run out of pool and `has_more` honestly
+turns false — with the frontend's limit of 24 that is around page 10.
 
 | Query param | Meaning |
 |-------------|---------|
@@ -130,12 +136,12 @@ IPs are taken from the connection address (trusted proxies are disabled), so
 a spoofed `X-Forwarded-For` cannot rotate limits. If you deploy behind a
 reverse proxy, configure gin's trusted proxies accordingly.
 
-The search cache serves identical requests from memory for
-`books.cache_ttl_in_second` (default 300s), which absorbs bursts without
-hammering rate-limited upstreams. Any search in which at least one provider
-succeeded is cached; a fully failed search is never cached. Cached responses
-report the provider statuses observed when they were built, and the TTL is
-when the next request retries every provider.
+The search cache stores the fused result pool per query and serves page
+navigation from it for `books.cache_ttl_in_second` (default 300s), which
+absorbs bursts without hammering rate-limited upstreams. Any search in which
+at least one provider succeeded is cached; a fully failed search is never
+cached. Cached responses report the provider statuses observed when the pool
+was built, and the TTL is when the next request retries every provider.
 
 ### Known provider limitations
 
@@ -148,10 +154,10 @@ when the next request retries every provider.
   networks.
 - **Gutendex** occasionally times out from some networks; it has a 25s
   configured budget and recovers on retry.
-- **Deep pagination** re-fetches and re-fuses the whole result pool on every
-  page request — the price of stateless, stable RRF ordering. Identical
-  requests are served from the short-TTL cache; distinct pages still re-fetch
-  by design.
+- **Deep pagination** fetches the requested page plus a lookahead window and
+  caches the fused pool, so page navigation within the pool is served from
+  memory; pages beyond the pool (or a new query) re-fetch by design, which is
+  the price of stateless, stable RRF ordering.
 - **Open Library** sometimes serves blank/white cover images that load
   successfully, so the frontend's broken-image fallback cannot detect them.
 

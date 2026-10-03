@@ -8,13 +8,20 @@ import (
 	"time"
 )
 
-const searchCacheMaxEntries = 512
+// searchCacheMaxEntries bounds memory: each entry holds a whole fused result
+// pool, not just one page of it.
+const searchCacheMaxEntries = 128
 
-// searchCache remembers fully successful fused responses for a short window.
-// Every search fans out to the providers, which rate limit per client IP, so
-// serving identical requests from memory keeps traffic bursts from turning
-// into upstream 403s and timeouts. The cache is deliberately tiny: a fixed
-// entry cap, TTL expiry, and no invalidation.
+// poolLookaheadPages is how many pages beyond the requested one a cache-miss
+// fetch covers. With the frontend's limit of 24, one fetch serves the clicked
+// page plus the next four Next-clicks from memory; going deeper re-fetches.
+const poolLookaheadPages = 4
+
+// searchCache remembers fused result pools for a short window. Pagination is
+// stateless "fetch deeper, then slice": every page request would otherwise
+// re-fan-out to every provider with a deeper fetch, so the cache stores the
+// whole sorted pool per query — page changes then slice it locally instead of
+// hammering rate-limited upstreams again.
 type searchCache struct {
 	entries map[string]searchCacheEntry
 	mu      sync.Mutex
@@ -23,9 +30,13 @@ type searchCache struct {
 
 // searchCacheEntry keeps the expiry as raw nanoseconds: with a uniform TTL,
 // expiry order is insertion order, so eviction needs no second timestamp.
+// fetchLimit is the page×limit depth the providers were asked for; page
+// requests within it slice the pool, deeper ones re-fetch.
 type searchCacheEntry struct {
-	response  SearchResponse
-	expiresAt int64
+	pool       []SearchResult
+	providers  []ProviderStatus
+	fetchLimit int
+	expiresAt  int64
 }
 
 func newSearchCache(ttl time.Duration) *searchCache {
@@ -35,31 +46,33 @@ func newSearchCache(ttl time.Duration) *searchCache {
 	}
 }
 
-// get returns the cached response for the normalized request when one is
-// fresh. Callers must treat the response as read-only: it is shared between
-// requests and marshaled concurrently.
-func (c *searchCache) get(request SearchRequest, now time.Time) (SearchResponse, bool) {
+// get returns the cached pool for the query when it is fresh and deep enough
+// to serve the requested page. Callers must treat the pool and statuses as
+// read-only: they are shared between requests and marshaled concurrently.
+func (c *searchCache) get(request SearchRequest, now time.Time) (searchCacheEntry, bool) {
 	if c == nil || c.ttl <= 0 {
-		return SearchResponse{}, false
+		return searchCacheEntry{}, false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	entry, ok := c.entries[cacheKey(request)]
+	entry, ok := c.entries[poolKey(request)]
 	if !ok || now.UnixNano() >= entry.expiresAt {
-		return SearchResponse{}, false
+		return searchCacheEntry{}, false
 	}
-	return entry.response, true
+	if request.Page*request.Limit > entry.fetchLimit {
+		return searchCacheEntry{}, false
+	}
+	return entry, true
 }
 
-// put stores a response for the normalized request. Search only reaches this
-// point when at least one provider succeeded, so degraded responses (some
-// providers errored) are cached too: on networks where a provider is blocked,
-// the strict alternative would never cache at all and every request would
-// re-fan-out to the healthy providers. Provider statuses inside a cached
-// response describe the fetch that built it and are frozen until the entry
-// expires; a fully failed search returns an error before it gets here and is
-// never cached.
-func (c *searchCache) put(request SearchRequest, response SearchResponse, now time.Time) {
+// put stores the pool built for a query. Search only reaches this point when
+// at least one provider succeeded, so degraded pools (some providers errored)
+// are cached too: on networks where a provider is blocked, the strict
+// alternative would never cache at all and every request would re-fan-out to
+// the healthy providers. Statuses inside a cached entry describe the fetch
+// that built it and are frozen until the entry expires; a fully failed search
+// returns an error before it gets here and is never cached.
+func (c *searchCache) put(request SearchRequest, pool []SearchResult, providers []ProviderStatus, fetchLimit int, now time.Time) {
 	if c == nil || c.ttl <= 0 {
 		return
 	}
@@ -68,9 +81,11 @@ func (c *searchCache) put(request SearchRequest, response SearchResponse, now ti
 	if len(c.entries) >= searchCacheMaxEntries {
 		c.evictLocked(now)
 	}
-	c.entries[cacheKey(request)] = searchCacheEntry{
-		response:  response,
-		expiresAt: now.Add(c.ttl).UnixNano(),
+	c.entries[poolKey(request)] = searchCacheEntry{
+		pool:       pool,
+		providers:  providers,
+		fetchLimit: fetchLimit,
+		expiresAt:  now.Add(c.ttl).UnixNano(),
 	}
 }
 
@@ -95,17 +110,19 @@ func (c *searchCache) evictLocked(now time.Time) {
 	}
 }
 
-// cacheKey canonically serializes the normalized request so topic order,
-// provider order, and formatting differences do not split the cache.
-func cacheKey(request SearchRequest) string {
+// poolKey canonically serializes the normalized request minus the page, so
+// topic order, provider order, and formatting differences do not split the
+// cache while page navigation shares one pool. fmt's %v of a pointer would
+// print an address, so nilable values render by value.
+func poolKey(request SearchRequest) string {
 	topics := sortedLowered(request.Topics)
 	providers := sortedLowered(request.Providers)
-	return fmt.Sprintf("topics=%s|genre=%s|providers=%s|language=%s|min_year=%s|max_year=%s|min_popularity=%s|min_rating=%s|limit=%d|page=%d",
+	return fmt.Sprintf("topics=%s|genre=%s|providers=%s|language=%s|min_year=%s|max_year=%s|min_popularity=%s|min_rating=%s|limit=%d",
 		strings.Join(topics, ","), strings.ToLower(strings.TrimSpace(request.Genre)), strings.Join(providers, ","),
 		strings.ToLower(strings.TrimSpace(request.Language)),
 		orNone(request.MinYear), orNone(request.MaxYear),
 		orNoneFloat(request.MinPopularity), orNoneFloat(request.MinRating),
-		request.Limit, request.Page)
+		request.Limit)
 }
 
 func sortedLowered(values []string) []string {
@@ -117,8 +134,7 @@ func sortedLowered(values []string) []string {
 	return result
 }
 
-// orNone renders a nilable int by value: fmt's %v of a pointer would print an
-// address, making every request a distinct cache key.
+// orNone renders a nilable int by value.
 func orNone(value *int) string {
 	if value == nil {
 		return "-"

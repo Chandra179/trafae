@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -153,7 +154,7 @@ func TestSearchPaginatesFusedResults(t *testing.T) {
 		catalog = append(catalog, book)
 	}
 	provider := &stubProvider{capability: ProviderCapability{ID: "gutendex", Filters: []string{FilterTopics, FilterGenre}}, books: catalog}
-	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}})
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}, SearchCacheTTL: time.Minute})
 	query := func(page int) SearchRequest {
 		return SearchRequest{Topics: []string{"biology"}, Limit: 2, Page: page}
 	}
@@ -198,9 +199,15 @@ func TestSearchPaginatesFusedResults(t *testing.T) {
 	if len(fourth.Results) != 0 || fourth.HasMore {
 		t.Fatalf("page 4 = %#v", fourth)
 	}
-	last := provider.requests[len(provider.requests)-1]
-	if last.Limit != 8 {
-		t.Fatalf("provider fetch limit = %d, want 8 (page 4 * limit 2)", last.Limit)
+	// Pages 2-4 slice the cached pool built by the page-1 fetch (which asks
+	// for the requested page plus poolLookaheadPages), so the provider sees a
+	// single request across the whole page walk.
+	if provider.calls != 1 {
+		t.Fatalf("provider called %d times, want 1 (page navigation must not re-fan-out)", provider.calls)
+	}
+	if provider.requests[0].Limit != (1+poolLookaheadPages)*2 {
+		t.Fatalf("provider fetch limit = %d, want %d ((page 1 + %d lookahead) * limit 2)",
+			provider.requests[0].Limit, (1+poolLookaheadPages)*2, poolLookaheadPages)
 	}
 }
 

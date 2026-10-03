@@ -28,10 +28,12 @@ func (d *dependencies) Capabilities() []ProviderCapability {
 }
 
 func (d *dependencies) Search(ctx context.Context, request SearchRequest) (SearchResponse, error) {
+	started := time.Now()
+	defer func() { d.metrics.RecordSearchDuration(time.Since(started)) }()
 	request = d.normalizeRequest(request)
-	if response, ok := d.cache.get(request, time.Now()); ok {
+	if entry, ok := d.cache.get(request, time.Now()); ok {
 		d.metrics.RecordSearch(true)
-		return response, nil
+		return poolResponse(entry, request), nil
 	}
 	d.metrics.RecordSearch(false)
 	response := SearchResponse{Results: []SearchResult{}, Providers: []ProviderStatus{}, Limit: request.Limit, Page: request.Page}
@@ -40,11 +42,12 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 		return response, errors.New("no configured providers matched the request")
 	}
 
-	// Providers fetch enough for every page up to the requested one so page N
-	// can be served by fusing each provider's top results and slicing; see the
-	// slice at the end of Search.
+	// Providers fetch the requested page plus the lookahead so the next few
+	// Next-clicks slice the cached pool instead of re-fanning-out; going
+	// deeper than the cached pool re-fetches with fresh lookahead.
 	fetchRequest := request
-	fetchRequest.Limit = request.Page * request.Limit
+	fetchLimit := min(request.Page+poolLookaheadPages, MaxSearchPage) * request.Limit
+	fetchRequest.Limit = fetchLimit
 	// Genre-only browse: keyword-search the genre so every provider can
 	// contribute, instead of post-filtering each provider's default batch.
 	if len(fetchRequest.Topics) == 0 && !strings.EqualFold(request.Genre, DefaultGenre) {
@@ -125,18 +128,25 @@ func (d *dependencies) Search(ctx context.Context, request SearchRequest) (Searc
 		}
 		return strings.ToLower(ordered[i].Book.Title) < strings.ToLower(ordered[j].Book.Title)
 	})
+	d.cache.put(request, ordered, response.Providers, fetchLimit, time.Now())
+	return poolResponse(searchCacheEntry{pool: ordered, providers: response.Providers}, request), nil
+}
+
+// poolResponse slices the cached pool for the requested page. The pool and
+// statuses are shared cache state and treated as read-only.
+func poolResponse(entry searchCacheEntry, request SearchRequest) SearchResponse {
+	response := SearchResponse{Results: []SearchResult{}, Providers: entry.providers, Limit: request.Limit, Page: request.Page}
 	start := (request.Page - 1) * request.Limit
-	if start > len(ordered) {
-		start = len(ordered)
+	if start > len(entry.pool) {
+		start = len(entry.pool)
 	}
 	end := start + request.Limit
-	if end > len(ordered) {
-		end = len(ordered)
+	if end > len(entry.pool) {
+		end = len(entry.pool)
 	}
-	response.HasMore = end < len(ordered)
-	response.Results = ordered[start:end]
-	d.cache.put(request, response, time.Now())
-	return response, nil
+	response.HasMore = end < len(entry.pool)
+	response.Results = entry.pool[start:end]
+	return response
 }
 
 // mergeProviderBooks folds one provider's ranked results into the fusion pool,

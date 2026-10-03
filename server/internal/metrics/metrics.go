@@ -6,20 +6,28 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 const unknownProvider = "unknown"
 
+// searchDurationBucketBounds are the upper bounds, in milliseconds, of the
+// search-latency histogram. The last bucket "inf" catches everything above
+// the largest bound — that tail is where provider timeouts live.
+var searchDurationBucketBounds = [...]int64{100, 250, 500, 1000, 2500, 5000, 10000, 25000}
+
 // Metrics is safe for concurrent use by handlers and services.
 type Metrics struct {
 	providerStatus map[string]map[string]*atomic.Int64
 	providerClicks map[string]map[string]*atomic.Int64
+	durations      [len(searchDurationBucketBounds) + 1]atomic.Int64
 	mu             sync.Mutex
 	searches       atomic.Int64
 	searchesCached atomic.Int64
@@ -44,6 +52,22 @@ func (m *Metrics) RecordSearch(cached bool) {
 		return
 	}
 	m.searches.Add(1)
+}
+
+// RecordSearchDuration adds one search latency to the histogram. Cached
+// searches land here too — they are real user-perceived latencies.
+func (m *Metrics) RecordSearchDuration(d time.Duration) {
+	if m == nil {
+		return
+	}
+	ms := d.Milliseconds()
+	for i, bound := range searchDurationBucketBounds {
+		if ms <= bound {
+			m.durations[i].Add(1)
+			return
+		}
+	}
+	m.durations[len(searchDurationBucketBounds)].Add(1)
 }
 
 // RecordProviderStatus counts one provider outcome as reported in a search
@@ -105,6 +129,7 @@ func (m *Metrics) Snapshot() gin.H {
 		return gin.H{
 			"searches_total":        0,
 			"searches_cached_total": 0,
+			"search_duration_ms":    map[string]int64{},
 			"provider_status":       map[string]map[string]int64{},
 			"access_clicks":         map[string]map[string]int64{},
 			"events_rejected_total": 0,
@@ -115,9 +140,16 @@ func (m *Metrics) Snapshot() gin.H {
 	providerClicks := snapshotCounters(m.providerClicks)
 	m.mu.Unlock()
 
+	durations := make(map[string]int64, len(m.durations))
+	for i, bound := range searchDurationBucketBounds {
+		durations[fmt.Sprintf("%d", bound)] = m.durations[i].Load()
+	}
+	durations["inf"] = m.durations[len(searchDurationBucketBounds)].Load()
+
 	return gin.H{
 		"searches_total":        m.searches.Load(),
 		"searches_cached_total": m.searchesCached.Load(),
+		"search_duration_ms":    durations,
 		"provider_status":       providerStatus,
 		"access_clicks":         providerClicks,
 		"events_rejected_total": m.eventsRejected.Load(),

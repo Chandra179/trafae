@@ -104,3 +104,52 @@ func TestSearchCacheIsDisabledWithoutTTL(t *testing.T) {
 		t.Fatalf("provider called %d times, want 2 (cache must be disabled at TTL zero)", provider.calls)
 	}
 }
+
+func TestSearchRefetchesWhenPoolNotDeepEnough(t *testing.T) {
+	t.Parallel()
+
+	provider := &stubProvider{capability: ProviderCapability{ID: "gutendex", Filters: []string{FilterTopics, FilterGenre}}, books: []Book{discoveryBook("gutendex", "1", 100)}}
+	service := NewDependencies(&DependenciesConfig{Providers: []Provider{provider}, SearchCacheTTL: time.Minute})
+	limit := 2
+	page := func(n int) SearchRequest {
+		return SearchRequest{Topics: []string{"history"}, Limit: limit, Page: n}
+	}
+
+	// Page 1 fetches (1+lookahead)*limit depth, so the next few pages hit.
+	if _, err := service.Search(context.Background(), page(1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Search(context.Background(), page(2)); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 1 {
+		t.Fatalf("page 2: provider called %d times, want 1", provider.calls)
+	}
+
+	// A page beyond the cached depth re-fetches with fresh lookahead. Page 3
+	// (needs 6 ≤ depth 10) still hits; page 6 needs 12 > 10, so it misses.
+	if _, err := service.Search(context.Background(), page(3)); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 1 {
+		t.Fatalf("page 3: provider called %d times, want 1", provider.calls)
+	}
+	if _, err := service.Search(context.Background(), page(6)); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("page 6: provider called %d times, want 2", provider.calls)
+	}
+	last := provider.requests[len(provider.requests)-1]
+	if last.Limit != (6+poolLookaheadPages)*limit {
+		t.Fatalf("deep fetch limit = %d, want %d", last.Limit, (6+poolLookaheadPages)*limit)
+	}
+
+	// Going back must slice the new, deeper pool without another fetch.
+	if _, err := service.Search(context.Background(), page(1)); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("back to page 1: provider called %d times, want 2", provider.calls)
+	}
+}

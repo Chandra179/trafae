@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom"
 
 import { searchBooks, type ProviderStatus, type SearchResponse } from "@/api/books"
 import { BookCard } from "@/components/book-card"
+import { FilterToolbar, type FilterState } from "@/components/filters"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,29 +13,10 @@ import {
   providerLabel,
 } from "@/lib/book-display"
 
-const LANGUAGES = ["en", "fr", "de", "es", "it", "pt"] as const
-
-const LANGUAGE_LABELS: Record<string, string> = {
-  en: "English",
-  fr: "French",
-  de: "German",
-  es: "Spanish",
-  it: "Italian",
-  pt: "Portuguese",
-}
-
-const RATINGS = [
-  { value: undefined, label: "Any rating" },
-  { value: 3.5, label: "3.5+" },
-  { value: 4, label: "4.0+" },
-  { value: 4.5, label: "4.5+" },
-] as const
-
-type FilterState = {
-  language: string
-  minRating: string
-  minYear: string
-  maxYear: string
+type LoadedSearch = {
+  key: string
+  response?: SearchResponse
+  error?: string
 }
 
 function filtersFromParams(searchParams: URLSearchParams): FilterState {
@@ -54,115 +36,74 @@ function setOrDelete(params: URLSearchParams, key: string, value: string) {
   }
 }
 
-type LoadedSearch = {
-  key: string
-  response?: SearchResponse
-  error?: string
+function joinAnd(names: string[]) {
+  if (names.length <= 1) return names.join("")
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
 }
 
-function ProviderChip({ status }: { status: ProviderStatus }) {
-  const label = providerLabel(status.provider)
-  if (status.status === "ok" || status.status === "partial") {
-    const partial = status.status === "partial"
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 rounded border border-border bg-card px-2.5 py-1 font-sans text-xs text-foreground"
-        title={
-          partial
-            ? `${label} returned ${status.count ?? 0} books (partial: ${status.reason ?? "some requests failed"})`
-            : `${label} returned ${status.count ?? 0} books`
-        }
-      >
-        <span className={`size-[7px] rounded-full ${partial ? "bg-[#c9b98a]" : "bg-primary"}`} />
-        {label} <span className="font-semibold">{status.count ?? 0}</span>
-        {partial && " partial"}
-      </span>
-    )
-  }
-  if (status.status === "skipped") {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 rounded border border-border bg-card px-2.5 py-1 font-sans text-xs text-muted-foreground"
-        title={status.reason}
-      >
-        <span className="size-[7px] rounded-full bg-[#c9b98a]" />
-        {label} skipped
-      </span>
-    )
-  }
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded border border-destructive/40 bg-card px-2.5 py-1 font-sans text-xs text-destructive"
-      title={status.reason}
-    >
-      <span className="size-[7px] rounded-full bg-destructive" />
-      {label} failed
-    </span>
-  )
-}
-
-function Filters({
-  filters,
-  onChange,
-}: {
-  filters: FilterState
-  onChange: (filters: FilterState) => void
-}) {
-  const selectClass =
-    "h-9 rounded-md border border-input bg-white px-2.5 font-sans text-sm text-foreground shadow-xs"
-  const inputClass =
-    "h-9 w-24 rounded-md border border-input bg-white px-2.5 font-sans text-sm shadow-xs placeholder:text-muted-foreground/60"
+// One quiet line under the results header: who answered, and a collapsed
+// detail for who didn't, so a blocked catalog doesn't read as a broken site.
+function ProviderLine({ statuses }: { statuses: ProviderStatus[] }) {
+  if (statuses.length === 0) return null
+  const served = statuses.filter((s) => s.status === "ok" || s.status === "partial")
+  const failed = statuses.filter((s) => s.status === "error")
+  const skipped = statuses.filter((s) => s.status === "skipped")
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <select
-        aria-label="Language"
-        className={selectClass}
-        onChange={(event) => onChange({ ...filters, language: event.target.value })}
-        value={filters.language}
-      >
-        <option value="">Any language</option>
-        {LANGUAGES.map((code) => (
-          <option key={code} value={code}>
-            {LANGUAGE_LABELS[code]}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Minimum rating"
-        className={selectClass}
-        onChange={(event) => onChange({ ...filters, minRating: event.target.value })}
-        value={filters.minRating}
-      >
-        {RATINGS.map((rating) => (
-          <option key={rating.label} value={rating.value ?? ""}>
-            {rating.label}
-          </option>
-        ))}
-      </select>
-      <div className="flex items-center gap-1.5">
-        <input
-          aria-label="Year from"
-          className={inputClass}
-          max={3000}
-          min={-3000}
-          onChange={(event) => onChange({ ...filters, minYear: event.target.value })}
-          placeholder="From year"
-          type="number"
-          value={filters.minYear}
-        />
-        <span className="text-sm text-muted-foreground">–</span>
-        <input
-          aria-label="Year to"
-          className={inputClass}
-          max={3000}
-          min={-3000}
-          onChange={(event) => onChange({ ...filters, maxYear: event.target.value })}
-          placeholder="To year"
-          type="number"
-          value={filters.maxYear}
-        />
-      </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border pb-3.5 font-sans text-[13px] text-muted-foreground">
+      {served.length > 0 && (
+        <span
+          className="text-foreground"
+          title={served.map((s) => `${providerLabel(s.provider)}: ${s.count ?? 0} books`).join(", ")}
+        >
+          <span className="mr-1.5 inline-block size-[7px] rounded-full bg-primary align-middle" />
+          Results from{" "}
+          {joinAnd(
+            served.map((s) => providerLabel(s.provider) + (s.status === "partial" ? " (partial)" : "")),
+          )}
+        </span>
+      )}
+      {failed.length > 0 && (
+        <details className="relative">
+          <summary className="cursor-pointer list-none underline decoration-dotted underline-offset-[3px] hover:text-foreground">
+            {failed.length} {failed.length === 1 ? "catalog" : "catalogs"} didn't respond
+          </summary>
+          <div className="absolute left-0 top-6 z-30 w-80 rounded-lg border border-border bg-card p-3 shadow-[0_8px_22px_rgba(60,50,30,0.12)]">
+            <p>{joinAnd(failed.map((s) => providerLabel(s.provider)))} didn't answer in time.</p>
+            {failed.some((s) => s.reason) && (
+              <ul className="mt-1.5 space-y-0.5">
+                {failed
+                  .filter((s) => s.reason)
+                  .map((s) => (
+                    <li key={s.provider}>
+                      {providerLabel(s.provider)}: {s.reason}
+                    </li>
+                  ))}
+              </ul>
+            )}
+            <p className="mt-1.5">Your results are complete from the catalogs that did.</p>
+          </div>
+        </details>
+      )}
+      {skipped.length > 0 && (
+        <details className="relative">
+          <summary className="cursor-pointer list-none underline decoration-dotted underline-offset-[3px] hover:text-foreground">
+            {skipped.length} {skipped.length === 1 ? "catalog" : "catalogs"} skipped
+          </summary>
+          <div className="absolute left-0 top-6 z-30 w-80 rounded-lg border border-border bg-card p-3 shadow-[0_8px_22px_rgba(60,50,30,0.12)]">
+            <ul className="space-y-0.5">
+              {skipped
+                .filter((s) => s.reason)
+                .map((s) => (
+                  <li key={s.provider}>
+                    {providerLabel(s.provider)}: {s.reason}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </details>
+      )}
     </div>
   )
 }
@@ -271,7 +212,7 @@ export function HomePage() {
         params.set("page", String(next))
       }
     })
-    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    resultsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" })
   }
 
   const current = loaded.key === requestKey ? loaded : undefined
@@ -281,10 +222,26 @@ export function HomePage() {
   const results = response?.results ?? []
   const providerStatuses = response?.providers ?? []
 
+  // No federated total exists, so count what is loaded so far and let "+"
+  // signal that more pages are available.
+  const loadedSoFar = response ? (page - 1) * (response.limit ?? 24) + results.length : 0
+  const scopeLabel = genreLabel(genre).replace(" (all)", "")
+  const countNode =
+    !loading && !error && results.length > 0 ? (
+      <p className="mr-auto font-serif text-[19px]">
+        <span className="font-semibold">
+          {loadedSoFar.toLocaleString("en")}
+          {response?.has_more ? "+" : ""}
+        </span>{" "}
+        {loadedSoFar === 1 ? "book" : "books"}{" "}
+        <span className="font-sans text-[15px] text-muted-foreground">in {scopeLabel}</span>
+      </p>
+    ) : undefined
+
   const chipClass = (active: boolean) =>
     `rounded-full border px-[15px] py-1.5 font-sans text-sm transition-colors ${
       active
-        ? "border-foreground bg-foreground font-semibold text-background"
+        ? "border-foreground bg-foreground font-medium text-background"
         : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground"
     }`
 
@@ -294,8 +251,8 @@ export function HomePage() {
         <p className="font-sans text-[13px] font-semibold uppercase tracking-[0.18em] text-primary">
           Trafae · Free book discovery
         </p>
-        <h1 className="font-serif text-4xl font-semibold leading-[1.15] tracking-tight sm:text-[44px]">
-          The best books on any topic — that you can start reading free, today.
+        <h1 className="font-serif text-4xl leading-[1.15] tracking-tight sm:text-[44px]">
+          The best books on any topic that you can start reading free, today.
         </h1>
         <p className="mx-auto max-w-2xl text-[17px] text-muted-foreground">
           One search across Project Gutenberg, Open Library, Internet Archive, DOAB
@@ -314,10 +271,10 @@ export function HomePage() {
           <Input
             className="h-12 flex-1 rounded-l-lg rounded-r-none border-[1.5px] border-foreground bg-white font-serif text-[17px] placeholder:italic placeholder:text-stone-400"
             onChange={(event) => setTopicInput(event.target.value)}
-            placeholder="Search a topic — psychology, ancient Rome, climate…"
+            placeholder="Search a topic, like psychology or ancient Rome…"
             value={topicInput}
           />
-          <Button className="h-12 rounded-l-none rounded-r-lg px-6 font-sans text-base font-semibold" size="lg" type="submit">
+          <Button className="h-12 rounded-l-none rounded-r-lg px-6 font-sans text-base" size="lg" type="submit">
             Search the stacks
           </Button>
         </form>
@@ -335,30 +292,20 @@ export function HomePage() {
           ))}
         </div>
 
-        <div className="flex justify-center">
-          <Filters filters={filters} onChange={applyFilters} />
-        </div>
-
         {!searched && (
           <p className="text-center font-sans text-sm text-muted-foreground">
-            Pick a topic above, or browse a genre — no search term needed.
+            Pick a topic above, or browse a genre. No search term needed.
           </p>
         )}
       </section>
 
       {searched && (
         <section aria-label="Results" className="scroll-mt-6 space-y-4" ref={resultsRef}>
-          {providerStatuses.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3.5">
-              <span className="mr-1 font-sans text-[13px] text-muted-foreground">
-                Searched {providerStatuses.filter((p) => p.status === "ok" || p.status === "partial").length} of{" "}
-                {providerStatuses.length} catalogs:
-              </span>
-              {providerStatuses.map((status) => (
-                <ProviderChip key={status.provider} status={status} />
-              ))}
-            </div>
+          {!loading && !error && (
+            <FilterToolbar count={countNode} filters={filters} onChange={applyFilters} />
           )}
+
+          <ProviderLine statuses={providerStatuses} />
 
           {loading && (
             <div className="flex items-center gap-2 py-16 font-serif italic text-muted-foreground">

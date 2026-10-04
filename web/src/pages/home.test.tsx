@@ -82,16 +82,37 @@ it("applies filter edits immediately and returns to page 1", async () => {
   fireEvent.click(screen.getByRole("button", { name: /next/i }))
   await waitFor(() => expect(lastCall()).toMatchObject({ page: 2 }))
 
-  fireEvent.change(screen.getByLabelText("Language"), { target: { value: "fr" } })
+  fireEvent.click(screen.getByRole("button", { name: /^Language/ }))
+  fireEvent.click(screen.getByRole("option", { name: "French" }))
 
   await waitFor(() => expect(lastCall()).toMatchObject({ language: "fr", page: 1 }))
   expect(window.location.search).toBe("?topic=psychology&language=fr")
 })
 
+it("applies a year preset through the dropdown and shows it as a removable chip", async () => {
+  renderHome()
+  await submitTopic("psychology")
+  await waitFor(() => screen.getByRole("button", { name: /^Published/ }))
+
+  fireEvent.click(screen.getByRole("button", { name: /^Published/ }))
+  fireEvent.click(screen.getByRole("option", { name: "21st century" }))
+
+  await waitFor(() => expect(lastCall()).toMatchObject({ minYear: 2000, page: 1 }))
+  expect(window.location.search).toBe("?topic=psychology&min_year=2000")
+  expect(screen.getByRole("button", { name: "Remove Published filter" })).toBeTruthy()
+
+  fireEvent.click(screen.getByRole("button", { name: "Remove Published filter" }))
+
+  await waitFor(() => expect(lastCall()).toMatchObject({ minYear: undefined, maxYear: undefined }))
+  expect(window.location.search).toBe("?topic=psychology")
+})
+
 it("pages forward and back while keeping the applied state", async () => {
   renderHome()
   await submitTopic("psychology")
-  fireEvent.change(screen.getByLabelText("Language"), { target: { value: "fr" } })
+  await waitFor(() => screen.getByRole("button", { name: /^Language/ }))
+  fireEvent.click(screen.getByRole("button", { name: /^Language/ }))
+  fireEvent.click(screen.getByRole("option", { name: "French" }))
   await waitFor(() => expect(lastCall()).toMatchObject({ language: "fr" }))
 
   const next = screen.getByRole("button", { name: /next/i })

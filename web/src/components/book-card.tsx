@@ -7,7 +7,6 @@ import {
   formatAuthors,
   formatCount,
   licenseLabel,
-  providerLabel,
   readNowUrl,
 } from "@/lib/book-display"
 
@@ -71,7 +70,7 @@ export function BookCard({ result }: { result: SearchResult }) {
           <BookCover book={book} />
         </div>
         <CardHeader className="min-w-0 flex-1 gap-0 p-0">
-          <h3 className="break-words font-serif text-[17px] font-bold leading-[1.3]">{book.title}</h3>
+          <h3 className="break-words font-serif text-[17px] leading-[1.3]">{book.title}</h3>
           <p className="mt-0.5 font-serif text-sm italic text-muted-foreground">
             {formatAuthors(book)}
           </p>
@@ -110,15 +109,14 @@ export function BookCard({ result }: { result: SearchResult }) {
           Matched by{" "}
           <span className="font-semibold text-foreground">
             {catalogCount} {catalogCount === 1 ? "catalog" : "catalogs"}
-          </span>{" "}
-          — {sources.map((source) => providerLabel(source.provider)).join(", ")}
+          </span>
         </p>
       </CardContent>
 
       <CardFooter className="gap-2 px-4 pb-4 pt-3">
         {readUrl ? (
           <a
-            className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 font-sans text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-sans text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             href={readUrl}
             rel="noreferrer"
             target="_blank"

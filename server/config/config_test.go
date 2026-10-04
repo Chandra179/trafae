@@ -12,7 +12,7 @@ func TestConfigValidateRejectsMissingRequiredValues(t *testing.T) {
 
 	cfg := Config{
 		HTTP: HTTPConfig{
-			Port:                 "8080",
+			Port:                 "8081",
 			ReadTimeoutInSec:     1,
 			WriteTimeoutInSec:    1,
 			IdleTimeoutInSec:     1,
@@ -37,7 +37,7 @@ func TestLoadAppliesEnvironmentOverrides(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	contents := []byte(`
 http:
-  port: "8080"
+  port: "8081"
   read_timeout_in_second: 1
   write_timeout_in_second: 1
   idle_timeout_in_second: 1
@@ -69,7 +69,7 @@ func TestLoadRejectsExplicitlyEmptyRequiredOverride(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	contents := []byte(`
 http:
-  port: "8080"
+  port: "8081"
   read_timeout_in_second: 1
   write_timeout_in_second: 1
   idle_timeout_in_second: 1
@@ -97,7 +97,7 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	contents := []byte(`
 http:
-  port: "8080"
+  port: "8081"
   read_timeout_in_second: 1
   write_timeout_in_second: 1
   idle_timeout_in_second: 1

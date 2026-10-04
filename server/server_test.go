@@ -37,9 +37,9 @@ func TestListenAddress(t *testing.T) {
 		port string
 		want string
 	}{
-		{port: "8080", want: ":8080"},
-		{port: ":8080", want: ":8080"},
-		{port: "127.0.0.1:8080", want: "127.0.0.1:8080"},
+		{port: "8081", want: ":8081"},
+		{port: ":8081", want: ":8081"},
+		{port: "127.0.0.1:8081", want: "127.0.0.1:8081"},
 	} {
 		if got := listenAddress(tt.port); got != tt.want {
 			t.Errorf("listenAddress(%q) = %q, want %q", tt.port, got, tt.want)

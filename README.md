@@ -58,8 +58,8 @@ clients can adapt queries to what will actually be served.
 Examples:
 
 ```bash
-curl "http://localhost:8080/books/search?topic=biology&genre=non-fiction&min_rating=4&limit=10"
-curl "http://localhost:8080/books/search?genre=history&page=2&limit=24"
+curl "http://localhost:8081/books/search?topic=biology&genre=non-fiction&min_rating=4&limit=10"
+curl "http://localhost:8081/books/search?genre=history&page=2&limit=24"
 ```
 
 ### Backend
@@ -68,7 +68,7 @@ curl "http://localhost:8080/books/search?genre=history&page=2&limit=24"
 make run
 ```
 
-The API listens on `http://localhost:8080`. Health, readiness, and funnel
+The API listens on `http://localhost:8081`. Health, readiness, and funnel
 counters are available at `/health`, `/ready`, and `/metrics`.
 
 On startup the server syncs the official Project Gutenberg catalog (a gzipped
@@ -170,7 +170,7 @@ make web-install
 make web-dev
 ```
 
-The frontend listens on `http://localhost:5173` and proxies `/api/*` to the Go
+The frontend listens on `http://localhost:5174` and proxies `/api/*` to the Go
 server. The API client can be pointed at another server with
 `web/.env.local`:
 

@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trafae · Filter redesign prototype</title>
+<style>
+  :root {
+    --background: #faf7f1;
+    --foreground: #211c14;
+    --card: #fffdf8;
+    --primary: #2f5d3f;
+    --primary-soft: #eef3ee;
+    --secondary: #f2efe4;
+    --muted-foreground: #6f6656;
+    --border: #e4dcc9;
+    --radius: 0.5rem;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 24px 80px; }
+
+  .proto-banner {
+    max-width: 1120px; margin: 16px auto 0; padding: 8px 24px;
+    display: flex; justify-content: center;
+  }
+  .proto-banner span {
+    border: 1px dashed var(--border); background: var(--card);
+    color: var(--muted-foreground); border-radius: 999px;
+    padding: 4px 14px; font-size: 12px; letter-spacing: 0.04em;
+  }
+
+  /* ---- hero (unchanged app context) ---- */
+  .hero { text-align: center; padding-top: 20px; }
+  .eyebrow {
+    color: var(--primary); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 10px;
+  }
+  .hero h1 {
+    font-family: var(--serif); font-size: clamp(28px, 4.4vw, 42px);
+    line-height: 1.15; margin: 0 auto 12px; max-width: 760px; font-weight: 600;
+  }
+  .hero p.sub { color: var(--muted-foreground); font-size: 17px; margin: 0 auto; max-width: 620px; }
+
+  .search-row { display: flex; justify-content: center; gap: 0; margin: 28px 0 16px; }
+  .search-input {
+    width: min(480px, 100%); height: 48px; padding: 0 16px;
+    font-family: var(--serif); font-size: 17px; font-style: italic;
+    border: 1.5px solid var(--foreground); border-right: none;
+    border-radius: var(--radius) 0 0 var(--radius); background: #fff; color: var(--foreground);
+  }
+  .search-btn {
+    height: 48px; padding: 0 24px; border: none; cursor: pointer;
+    background: var(--primary); color: #f4f1e8;
+    font-size: 16px; font-weight: 600; border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 6px; }
+  .chip-btn {
+    border-radius: 999px; border: 1px solid var(--border); background: var(--card);
+    color: var(--muted-foreground); padding: 7px 15px; font-size: 14px; cursor: pointer;
+  }
+  .chip-btn.active { background: var(--foreground); border-color: var(--foreground); color: var(--background); font-weight: 600; }
+
+  /* ---- results toolbar (the redesign) ---- */
+  .results { margin-top: 44px; border-top: 1px solid var(--border); padding-top: 20px; }
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .count { font-family: var(--serif); font-size: 19px; margin-right: auto; }
+  .count b { font-weight: 700; }
+  .count .scope { color: var(--muted-foreground); font-size: 15px; }
+
+  .dd { position: relative; }
+  .dd-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 38px; padding: 0 13px; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: #fff; color: var(--muted-foreground); font-size: 14px;
+  }
+  .dd-btn .caret { font-size: 10px; opacity: 0.7; }
+  .dd-btn:hover { border-color: #cfc4a8; }
+  .dd-btn.set { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .dd-btn .clear-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; margin-right: -4px; border-radius: 999px;
+    font-size: 12px; line-height: 1; color: inherit;
+  }
+  .dd-btn .clear-x:hover { background: var(--primary); color: #fff; }
+
+  .panel {
+    position: absolute; z-index: 20; top: 44px; left: 0; min-width: 240px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(60, 50, 30, 0.12); padding: 6px; display: none;
+  }
+  .dd.open .panel { display: block; }
+  .panel .opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; text-align: left; padding: 9px 11px; border: none; background: none;
+    border-radius: 7px; font-size: 14px; color: var(--foreground); cursor: pointer;
+  }
+  .panel .opt:hover { background: var(--secondary); }
+  .panel .opt .tick { visibility: hidden; color: var(--primary); font-weight: 700; }
+  .panel .opt[aria-checked="true"] { font-weight: 600; }
+  .panel .opt[aria-checked="true"] .tick { visibility: visible; }
+  .panel .divider { height: 1px; background: var(--border); margin: 6px 8px; }
+
+  .custom-range { display: none; padding: 10px 11px 12px; }
+  .custom-range.show { display: block; }
+  .custom-range label { font-size: 12px; color: var(--muted-foreground); display: block; margin-bottom: 7px; }
+  .custom-range .fields { display: flex; align-items: center; gap: 7px; }
+  .custom-range input {
+    width: 78px; height: 34px; padding: 0 9px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--foreground);
+  }
+  .custom-range .apply {
+    height: 34px; padding: 0 13px; margin-left: 3px; border: none; border-radius: 7px;
+    background: var(--primary); color: #f4f1e8; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  .clear-all {
+    display: none; align-items: center; height: 38px; padding: 0 13px;
+    border: none; background: none; color: var(--muted-foreground);
+    font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  }
+  .clear-all.show { display: inline-flex; }
+  .clear-all:hover { color: var(--foreground); }
+
+  .active-chips { display: none; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .active-chips.show { display: flex; }
+  .fchip {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--primary); background: var(--primary-soft); color: var(--primary);
+    border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600;
+  }
+  .fchip small { font-weight: 400; opacity: 0.75; }
+  .fchip button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border: none; border-radius: 999px;
+    background: none; color: var(--primary); font-size: 13px; cursor: pointer; line-height: 1;
+  }
+  .fchip button:hover { background: var(--primary); color: #fff; }
+
+  /* ---- provider line: failures collapsed, not alarming ---- */
+  .provider-line {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px;
+    margin-top: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--muted-foreground);
+  }
+  .provider-line .ok { color: var(--foreground); }
+  .provider-line .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--primary); display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .provider-line details { position: relative; }
+  .provider-line summary {
+    cursor: pointer; list-style: none; text-decoration: underline dotted; text-underline-offset: 3px;
+  }
+  .provider-line summary::-webkit-details-marker { display: none; }
+  .provider-line details > div {
+    position: absolute; z-index: 30; top: 22px; left: 0; width: 300px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; box-shadow: 0 8px 22px rgba(60,50,30,0.12); font-size: 13px;
+  }
+
+  /* ---- sample cards ---- */
+  .grid { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); margin-top: 22px; }
+  .book {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 1px 2px rgba(60,50,30,0.05);
+  }
+  .book .top { display: flex; gap: 14px; padding: 16px; border-bottom: 1px dashed var(--border); }
+  .cover {
+    width: 86px; height: 122px; border-radius: 3px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 26px; font-weight: 700; color: rgba(255,255,255,0.9);
+    box-shadow: inset -6px 0 10px rgba(0,0,0,0.14), 0 2px 5px rgba(50,40,20,0.18);
+  }
+  .book h3 { font-family: var(--serif); font-size: 17px; line-height: 1.3; margin: 0; }
+  .book .author { font-family: var(--serif); font-style: italic; color: var(--muted-foreground); font-size: 14px; margin: 3px 0 0; }
+  .book .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 9px; font-size: 12px; color: var(--muted-foreground); }
+  .book .body { padding: 12px 16px 0; font-size: 14px; color: var(--muted-foreground); flex: 1; }
+  .book .foot { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 16px; }
+  .read {
+    background: var(--primary); color: #f4f1e8; text-decoration: none;
+    padding: 8px 16px; border-radius: 7px; font-size: 14px; font-weight: 600;
+  }
+  .matchline { font-size: 12px; color: var(--muted-foreground); }
+  .matchline b { color: var(--foreground); }
+
+  .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .pager button {
+    height: 34px; padding: 0 14px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--card); font-size: 13.5px; color: var(--foreground); cursor: pointer;
+  }
+  .pager button[disabled] { opacity: 0.45; cursor: default; }
+  .pager .page { font-family: var(--serif); font-size: 14px; color: var(--muted-foreground); }
+
+  .notes { margin-top: 56px; padding-top: 18px; border-top: 1px dashed var(--border); color: var(--muted-foreground); font-size: 13px; }
+  .notes h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; color: var(--muted-foreground); }
+  .notes li { margin-bottom: 5px; }
+
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+    .toolbar { position: relative; }
+    .panel { position: static; width: 100%; margin-top: 8px; box-shadow: none; }
+    .search-row { flex-direction: column; gap: 10px; padding: 0 4px; }
+    .search-input { border-radius: var(--radius); border-right: 1.5px solid var(--foreground); width: 100%; }
+    .search-btn { border-radius: var(--radius); }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-banner"><span>Static prototype · the filters are interactive, the results are sample data</span></div>
+
+<main>
+  <!-- ============ hero: unchanged ============ -->
+  <section class="hero">
+    <p class="eyebrow">Trafae · Free book discovery</p>
+    <h1>The best books on any topic that you can start reading free, today.</h1>
+    <p class="sub">One search across Project Gutenberg, Open Library, Internet Archive, DOAB and more. Legally free, no waitlists, straight to the book.</p>
+    <div class="search-row">
+      <input class="search-input" value="psychology" aria-label="Search a topic">
+      <button class="search-btn" type="button">Search the stacks</button>
+    </div>
+    <div class="chips" aria-label="Genres">
+      <button class="chip-btn active" type="button">Non-fiction (all)</button>
+      <button class="chip-btn" type="button">History</button>
+      <button class="chip-btn" type="button">Science</button>
+      <button class="chip-btn" type="button">Psychology</button>
+      <button class="chip-btn" type="button">Philosophy</button>
+      <button class="chip-btn" type="button">Biography</button>
+      <button class="chip-btn" type="button">Economics</button>
+      <button class="chip-btn" type="button">Travel</button>
+      <button class="chip-btn" type="button">Health</button>
+    </div>
+  </section>
+
+  <!-- ============ results with the redesigned filter toolbar ============ -->
+  <section class="results" aria-label="Results">
+    <div class="toolbar">
+      <span class="count"><b>1,248</b> books <span class="scope">in Non-fiction</span></span>
+
+      <div class="dd" data-filter="language">
+        <button class="dd-btn" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="label">Any language</span><span class="caret">▾</span>
+        </button>
+        <div class="panel" role="listbox" aria-label="Language">
+          <button class="opt" role="option" aria-checked="true" data-value="">Any language <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="English">English <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="French">French <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="German">German <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Spanish">Spanish <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Italian">Italian <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Portuguese">Portuguese <span class="tick">✓</span></button>
+        </div>
+      </div>
+
+      <div class="dd" data-filter="rating">
+        <button class="dd-btn" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="label">Any rating</span><span class="caret">▾</span>
+        </button>
+        <div class="panel" role="listbox" aria-label="Minimum rating">
+          <button class="opt" role="option" aria-checked="true" data-value="">Any rating <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="3.5★ &amp; up">★★★★ 3.5 &amp; up <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="4.0★ &amp; up">★★★★ 4.0 &amp; up <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="4.5★ &amp; up">★★★★½ 4.5 &amp; up <span class="tick">✓</span></button>
+        </div>
+      </div>
+
+      <div class="dd" data-filter="year">
+        <button class="dd-btn" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="label">Any year</span><span class="caret">▾</span>
+        </button>
+        <div class="panel" role="listbox" aria-label="Published">
+          <button class="opt" role="option" aria-checked="true" data-value="">Any year <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Past 10 years">Past 10 years <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Past 50 years">Past 50 years <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="21st century">21st century <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="20th century">20th century <span class="tick">✓</span></button>
+          <button class="opt" role="option" aria-checked="false" data-value="Before 1950">Before 1950 <span class="tick">✓</span></button>
+          <div class="divider"></div>
+          <button class="opt" role="option" aria-checked="false" data-value="__custom">Custom range… <span class="tick">✓</span></button>
+          <div class="custom-range" id="custom-range">
+            <label for="year-from">Published between</label>
+            <div class="fields">
+              <input id="year-from" type="number" placeholder="1990" aria-label="Year from">
+              <span aria-hidden="true">and</span>
+              <input id="year-to" type="number" placeholder="2025" aria-label="Year to">
+              <button class="apply" type="button">Apply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="clear-all" id="clear-all" type="button">Clear all</button>
+    </div>
+
+    <div class="active-chips" id="active-chips"></div>
+
+    <div class="provider-line">
+      <span class="ok"><span class="dot"></span>Results from Internet Archive, Open Library, Project Gutenberg and Wikidata</span>
+      <details>
+        <summary>3 catalogs didn't respond</summary>
+        <div>
+          DOAB, Gutendex and Library of Congress didn't answer in time. Your results
+          are complete from the catalogs that did. <a href="#">Try again</a>
+        </div>
+      </details>
+    </div>
+
+    <div class="grid">
+      <article class="book">
+        <div class="top">
+          <div class="cover" style="background:linear-gradient(160deg,#39506e,#1d2c42)">PS</div>
+          <div>
+            <h3>Psychology: A Study of Mental Life</h3>
+            <p class="author">Woodworth, Robert S.</p>
+            <div class="meta"><span>1921</span><span>★ 4.2 (312)</span><span>48k downloads</span><span style="color:var(--primary);font-weight:600">Public domain</span></div>
+          </div>
+        </div>
+        <div class="body"><p>A classic introduction to psychology, covering instinct, habit, feeling and the self.</p></div>
+        <div class="foot">
+          <a class="read" href="#">Read now</a>
+          <span class="matchline">Matched by <b>3 catalogs</b></span>
+        </div>
+      </article>
+
+      <article class="book">
+        <div class="top">
+          <div class="cover" style="background:linear-gradient(160deg,#3d6b4f,#1f3c2b)">TM</div>
+          <div>
+            <h3>The Mind and Its Education</h3>
+            <p class="author">Betts, George Herbert</p>
+            <div class="meta"><span>1906</span><span>★ 4.0 (97)</span><span>12k downloads</span><span style="color:var(--primary);font-weight:600">Public domain</span></div>
+          </div>
+        </div>
+        <div class="body"><p>How attention, memory and thinking develop, written for teachers and self-learners.</p></div>
+        <div class="foot">
+          <a class="read" href="#">Read now</a>
+          <span class="matchline">Matched by <b>2 catalogs</b></span>
+        </div>
+      </article>
+
+      <article class="book">
+        <div class="top">
+          <div class="cover" style="background:linear-gradient(160deg,#6e3950,#3c1e2c)">AT</div>
+          <div>
+            <h3>Atomic Habits</h3>
+            <p class="author">James Clear</p>
+            <div class="meta"><span>2016</span><span>★ 4.0 (1.4k)</span></div>
+          </div>
+        </div>
+        <div class="body"><p>Tiny changes, remarkable results: a system for building good habits and breaking bad ones.</p></div>
+        <div class="foot">
+          <a class="read" href="#">Read now</a>
+          <span class="matchline">Matched by <b>1 catalog</b></span>
+        </div>
+      </article>
+    </div>
+
+    <nav class="pager" aria-label="Result pages">
+      <button type="button" disabled>← Previous</button>
+      <span class="page">Page 1</span>
+      <button type="button">Next →</button>
+    </nav>
+  </section>
+
+  <section class="notes">
+    <h2>What changed in this prototype</h2>
+    <ul>
+      <li>The language, rating and year controls move out of the hero and into a results toolbar, next to the result count. They only appear once there is something to filter.</li>
+      <li>Each filter is one labeled dropdown that always shows its current value. The year filter offers plain-language presets plus an optional custom range.</li>
+      <li>Active filters appear as removable chips, with a Clear all action.</li>
+      <li>Failed catalogs collapse into one quiet line with details on click, instead of three red chips.</li>
+      <li>The Read now button uses the brand green, matching the primary search action.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+  const state = { language: "", rating: "", year: "", customYear: "" };
+
+  const dds = document.querySelectorAll(".dd");
+  const clearAllBtn = document.getElementById("clear-all");
+  const chipsRow = document.getElementById("active-chips");
+  const customRange = document.getElementById("custom-range");
+
+  function closeAll(except) {
+    dds.forEach((dd) => {
+      if (dd !== except) {
+        dd.classList.remove("open");
+        dd.querySelector(".dd-btn").setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  dds.forEach((dd) => {
+    const btn = dd.querySelector(".dd-btn");
+    const key = dd.dataset.filter;
+
+    btn.addEventListener("click", (event) => {
+      if (event.target.closest(".clear-x")) return;
+      const open = dd.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+      closeAll(dd);
+    });
+
+    dd.querySelectorAll(".opt").forEach((opt) => {
+      opt.addEventListener("click", () => {
+        dd.querySelectorAll(".opt").forEach((o) => o.setAttribute("aria-checked", "false"));
+        opt.setAttribute("aria-checked", "true");
+        const value = opt.dataset.value;
+        if (value === "__custom") {
+          state[key] = "";
+          customRange.classList.add("show");
+          update(); // keep chips honest while the range is being typed
+          return;
+        }
+        customRange.classList.remove("show");
+        state[key] = value;
+        state.customYear = "";
+        update();
+        dd.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+      });
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".dd")) closeAll(null);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeAll(null);
+  });
+
+  document.getElementById("year-from").addEventListener("input", () => {});
+  document.querySelector(".custom-range .apply").addEventListener("click", () => {
+    const from = document.getElementById("year-from").value;
+    const to = document.getElementById("year-to").value;
+    if (!from && !to) return;
+    state.year = "";
+    state.customYear = from && to ? from + " to " + to : (from ? "after " + from : "before " + to);
+    const yearDd = document.querySelector('.dd[data-filter="year"]');
+    yearDd.querySelectorAll(".opt").forEach((o) => o.setAttribute("aria-checked", "false"));
+    yearDd.querySelector('[data-value="__custom"]').setAttribute("aria-checked", "true");
+    customRange.classList.remove("show");
+    update();
+    yearDd.classList.remove("open");
+  });
+
+  clearAllBtn.addEventListener("click", () => {
+    state.language = ""; state.rating = ""; state.year = ""; state.customYear = "";
+    dds.forEach((dd) => {
+      dd.querySelectorAll(".opt").forEach((o) =>
+        o.setAttribute("aria-checked", String(o.dataset.value === "")));
+      dd.querySelector(".label").textContent = dd.dataset.filter === "year" ? "Any year" : dd.dataset.filter === "rating" ? "Any rating" : "Any language";
+      dd.querySelector(".dd-btn").classList.remove("set");
+    });
+    customRange.classList.remove("show");
+    update();
+  });
+
+  function removeFilter(key) {
+    state[key] = ""; state.customYear = "";
+    const dd = document.querySelector('.dd[data-filter="' + key + '"]');
+    dd.querySelectorAll(".opt").forEach((o) =>
+      o.setAttribute("aria-checked", String(o.dataset.value === "")));
+    dd.querySelector(".label").textContent =
+      key === "year" ? "Any year" : key === "rating" ? "Any rating" : "Any language";
+    dd.querySelector(".dd-btn").classList.remove("set");
+    customRange.classList.remove("show");
+    update();
+  }
+
+  function update() {
+    const labels = { language: "Language", rating: "Rating", year: "Published" };
+    dds.forEach((dd) => {
+      const key = dd.dataset.filter;
+      const value = state.customYear && key === "year" ? state.customYear : state[key];
+      const label = dd.querySelector(".label");
+      const btn = dd.querySelector(".dd-btn");
+      if (value) {
+        label.textContent = value;
+        btn.classList.add("set");
+        if (!btn.querySelector(".clear-x")) {
+          const x = document.createElement("span");
+          x.className = "clear-x";
+          x.textContent = "×";
+          x.setAttribute("role", "button");
+          x.setAttribute("aria-label", "Clear " + labels[key]);
+          x.addEventListener("click", (event) => {
+            event.stopPropagation();
+            removeFilter(key);
+          });
+          btn.appendChild(x);
+        }
+      } else {
+        label.textContent = key === "year" ? "Any year" : key === "rating" ? "Any rating" : "Any language";
+        btn.classList.remove("set");
+        const x = btn.querySelector(".clear-x");
+        if (x) x.remove();
+      }
+    });
+
+    chipsRow.innerHTML = "";
+    const active = ["language", "rating", "year"].filter((k) =>
+      k === "year" ? state.year || state.customYear : state[k]);
+    if (active.length > 0) {
+      chipsRow.classList.add("show");
+      clearAllBtn.classList.add("show");
+      active.forEach((key) => {
+        const value = key === "year" && state.customYear ? state.customYear : state[key];
+        const chip = document.createElement("span");
+        chip.className = "fchip";
+        const text = document.createElement("span");
+        text.innerHTML = "<small>" + labels[key] + ":</small> " + value;
+        const x = document.createElement("button");
+        x.type = "button";
+        x.textContent = "×";
+        x.setAttribute("aria-label", "Remove " + labels[key] + " filter");
+        x.addEventListener("click", () => removeFilter(key));
+        chip.appendChild(text);
+        chip.appendChild(x);
+        chipsRow.appendChild(chip);
+      });
+    } else {
+      chipsRow.classList.remove("show");
+      clearAllBtn.classList.remove("show");
+    }
+  }
+</script>
+</body>
+</html>

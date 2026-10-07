@@ -67,10 +67,10 @@ function ProviderLine({ statuses }: { statuses: ProviderStatus[] }) {
       {failed.length > 0 && (
         <details className="relative">
           <summary className="cursor-pointer list-none underline decoration-dotted underline-offset-[3px] hover:text-foreground">
-            {failed.length} {failed.length === 1 ? "catalog" : "catalogs"} didn't respond
+            {failed.length} {failed.length === 1 ? "catalog" : "catalogs"} unavailable
           </summary>
           <div className="absolute left-0 top-6 z-30 w-80 rounded-lg border border-border bg-card p-3 shadow-[0_8px_22px_rgba(60,50,30,0.12)]">
-            <p>{joinAnd(failed.map((s) => providerLabel(s.provider)))} didn't answer in time.</p>
+            <p>{joinAnd(failed.map((s) => providerLabel(s.provider)))} couldn't return results.</p>
             {failed.some((s) => s.reason) && (
               <ul className="mt-1.5 space-y-0.5">
                 {failed
@@ -82,7 +82,7 @@ function ProviderLine({ statuses }: { statuses: ProviderStatus[] }) {
                   ))}
               </ul>
             )}
-            <p className="mt-1.5">Your results are complete from the catalogs that did.</p>
+            <p className="mt-1.5">Available results are shown below.</p>
           </div>
         </details>
       )}
@@ -157,7 +157,9 @@ export function HomePage() {
       },
       { signal: controller.signal },
     )
-      .then((response) => setLoaded({ key, response }))
+      .then((response) => {
+        if (!controller.signal.aborted) setLoaded({ key, response })
+      })
       .catch((err: Error) => {
         if (!controller.signal.aborted) setLoaded({ key, error: err.message })
       })
@@ -252,11 +254,11 @@ export function HomePage() {
           Trafae · Free book discovery
         </p>
         <h1 className="font-serif text-4xl leading-[1.15] tracking-tight sm:text-[44px]">
-          The best books on any topic that you can start reading free, today.
+          Find books on a topic across open book collections.
         </h1>
         <p className="mx-auto max-w-2xl text-[17px] text-muted-foreground">
           One search across Project Gutenberg, Open Library, Internet Archive, DOAB
-          and more. Legally free, no waitlists, straight to the book.
+          and more. Read or download where available; access terms vary by collection.
         </p>
       </section>
 

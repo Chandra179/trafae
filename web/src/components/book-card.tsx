@@ -7,7 +7,7 @@ import {
   formatAuthors,
   formatCount,
   licenseLabel,
-  readNowUrl,
+  bookAccessAction,
 } from "@/lib/book-display"
 
 // Book-spine gradients matched to the Editorial Library prototype (c1–c5).
@@ -60,7 +60,7 @@ function BookCover({ book }: { book: Book }) {
 
 export function BookCard({ result }: { result: SearchResult }) {
   const { book, sources } = result
-  const readUrl = readNowUrl(book)
+  const access = bookAccessAction(result)
   const catalogCount = sources.length
 
   return (
@@ -114,30 +114,30 @@ export function BookCard({ result }: { result: SearchResult }) {
       </CardContent>
 
       <CardFooter className="gap-2 px-4 pb-4 pt-3">
-        {readUrl ? (
+        {access ? (
           <a
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-sans text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            href={readUrl}
+            href={access.url}
             rel="noreferrer"
             target="_blank"
-            onClick={() => sendAccessClick(book.source.provider)}
+            onClick={access.label === "Read / download" ? () => sendAccessClick(access.provider) : undefined}
           >
-            Read now
+            {access.label}
           </a>
         ) : (
           <span className="inline-flex items-center rounded-md bg-secondary px-4 py-2 font-sans text-sm font-medium text-muted-foreground">
-            No direct link
+            No link available
           </span>
         )}
-        {book.access_urls && book.access_urls.length > 1 && (
+        {access?.alternateUrl && (
           <a
             className="font-sans text-[13px] font-medium text-primary underline underline-offset-[3px] hover:text-primary/80"
-            href={book.access_urls[1]}
+            href={access.alternateUrl}
             rel="noreferrer"
             target="_blank"
-            onClick={() => sendAccessClick(book.source.provider)}
+            onClick={() => sendAccessClick(access.provider)}
           >
-            More formats
+            Another format
           </a>
         )}
       </CardFooter>

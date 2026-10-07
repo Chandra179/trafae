@@ -1,4 +1,4 @@
-import type { Book } from "@/api/books"
+import type { Book, SearchResult } from "@/api/books"
 
 export const GENRES = [
   "non-fiction",
@@ -53,8 +53,43 @@ export function formatAuthors(book: Book) {
   return `${first} +${book.authors.length - 1}`
 }
 
-export function readNowUrl(book: Book) {
-  return book.url ?? book.access_urls?.[0] ?? ""
+function httpUrl(value: string | undefined) {
+  if (!value || !/^https?:\/\//i.test(value.trim())) return undefined
+  try {
+    const url = new URL(value.trim())
+    return url.hostname && (url.protocol === "http:" || url.protocol === "https:")
+      ? url.href
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+type BookAccessAction = {
+  url: string
+  label: "Read / download" | "View source"
+  alternateUrl?: string
+  provider?: string
+}
+
+export function bookAccessAction({ book, sources }: SearchResult): BookAccessAction | undefined {
+  const directUrls = [...new Set(
+    (book.access_urls ?? []).map(httpUrl).filter((url): url is string => Boolean(url)),
+  )]
+  if (directUrls.length > 0) {
+    // Gutendex is currently the only provider supplying direct content links.
+    // A merged record's representative source can come from another catalog.
+    const provider = sources.find((source) => source.provider === "gutendex")?.provider
+      ?? book.source.provider
+    return {
+      url: directUrls[0],
+      label: "Read / download",
+      alternateUrl: directUrls[1],
+      provider,
+    }
+  }
+  const sourceUrl = httpUrl(book.url) ?? httpUrl(book.source.url)
+  return sourceUrl ? { url: sourceUrl, label: "View source" } : undefined
 }
 
 export function licenseLabel(license: string) {
@@ -66,4 +101,3 @@ export function licenseLabel(license: string) {
   }
   return license.length > 24 ? `${license.slice(0, 24)}…` : license
 }
-

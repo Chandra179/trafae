@@ -3,8 +3,10 @@ package providers
 import (
 	"context"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/Chandra179/trafae/server/internal/books"
@@ -99,10 +101,44 @@ func (p *gutendexProvider) searchTerm(ctx context.Context, request books.SearchR
 }
 
 func formatURLs(formats map[string]string) []string {
-	urls := make([]string, 0, len(formats))
-	for _, value := range formats {
-		if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
-			urls = append(urls, value)
+	priority := map[string]int{
+		"text/html": 0, "application/xhtml+xml": 0,
+		"application/pdf": 1, "text/plain": 2,
+		"application/epub+zip": 3, "application/x-mobipocket-ebook": 4,
+	}
+	type bookFormat struct {
+		url      string
+		priority int
+	}
+	readable := make([]bookFormat, 0, len(formats))
+	for contentType, value := range formats {
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			continue
+		}
+		rank, ok := priority[mediaType]
+		if !ok {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			continue
+		}
+		readable = append(readable, bookFormat{url: value, priority: rank})
+	}
+	sort.Slice(readable, func(i, j int) bool {
+		if readable[i].priority != readable[j].priority {
+			return readable[i].priority < readable[j].priority
+		}
+		return readable[i].url < readable[j].url
+	})
+	urls := make([]string, 0, len(readable))
+	seen := make(map[string]struct{}, len(readable))
+	for _, format := range readable {
+		if _, exists := seen[format.url]; !exists {
+			urls = append(urls, format.url)
+			seen[format.url] = struct{}{}
 		}
 	}
 	return urls

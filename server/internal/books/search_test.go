@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,32 @@ func TestSearchFusesDuplicateBooksAndRetainsPerSourceMetrics(t *testing.T) {
 	}
 	if result.Sources[0].Popularity == nil || result.Sources[1].Popularity == nil {
 		t.Fatal("source popularity metrics were not preserved")
+	}
+}
+
+func TestMergeRetainsDirectLinksRegardlessOfRepresentativeCatalog(t *testing.T) {
+	catalog := discoveryBook("open_library", "OL1W", 50)
+	catalog.URL = "https://openlibrary.test/works/OL1W"
+	direct := discoveryBook("gutendex", "1", 100)
+	direct.URL = "https://gutenberg.test/ebooks/1"
+	direct.AccessURLs = []string{"https://gutenberg.test/book.html", "https://gutenberg.test/book.epub"}
+
+	for _, order := range [][]Book{{catalog, direct}, {direct, catalog}} {
+		merged := make(map[string]*SearchResult)
+		for _, book := range order {
+			mergeProviderBooks([]Book{book}, SearchRequest{}, book.Source.Provider, merged)
+		}
+		if len(merged) != 1 {
+			t.Fatalf("got %d results, want one merged book", len(merged))
+		}
+		for _, result := range merged {
+			if !slices.Equal(result.Book.AccessURLs, direct.AccessURLs) || len(result.Sources) != 2 {
+				t.Fatalf("direct links or source provenance lost: %#v", result)
+			}
+			if result.Book.Source.Provider != order[0].Source.Provider {
+				t.Fatal("representative catalog changed")
+			}
+		}
 	}
 }
 

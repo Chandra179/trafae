@@ -1,9 +1,9 @@
 ---
 title: "Trafae"
-description: "Trafae searches several open book catalogs and combines their results into one ranked list of books available to read for free."
+description: "Trafae searches several open book catalogs and combines their results into one ranked list, with direct book links where available."
 seoTitle: "Trafae: Search Multiple Open Book Collections"
-seoDescription: "Trafae searches multiple book catalogs, removes duplicates, and combines the results into one ranked list."
-answerSummary: "Trafae searches several open book catalogs and combines their results into one ranked list of books available to read for free."
+seoDescription: "Trafae searches multiple book catalogs, removes duplicates, and provides direct book links where available."
+answerSummary: "Trafae searches open book catalogs and combines results in one ranked list. Some results link directly to books; others link to catalog records."
 tags: [books, search, open-access, aggregation]
 links:
   github: "https://github.com/Chandra179/trafae"
@@ -14,7 +14,7 @@ created: 2026-10-03
 
 Trafae searches several open book collections at once and combines the
 results into one ranked list. Search for a topic or browse by genre to find
-books available to read for free.
+books, with direct reading links where collections provide them.
 
 It is useful for:
 
@@ -23,8 +23,9 @@ It is useful for:
 - researchers looking for freely readable books on a topic; and
 - readers who want to search several catalogs in one place.
 
-Trafae does not require an account or host books. It links to the collections
-that provide them; availability and access terms may vary by collection.
+Trafae does not require an account or host books. Some results link directly
+to book content; others open the source catalog. Availability and access
+terms vary by collection.
 
 ## How it works
 
@@ -41,12 +42,11 @@ duplicates removed · rankings combined · results ordered
 browse the list, filter it, turn the pages
         │
         ▼
-open the book where it can be read for free
+open direct book content or view the source catalog
 ```
 
-Trafae presents this through a web page with a search box, a row of
-genre shortcuts, and a list of book cards with covers, descriptions, and
-each collection's popularity and rating evidence.
+Trafae presents this through a web page with a search box, genre shortcuts,
+and book cards with covers, descriptions, ratings, and popularity details.
 
 ### 1. Search or browse
 
@@ -73,16 +73,21 @@ books that rank highly across several collections move up the list.
 
 ### 4. Open and read
 
-Each result links to where the book can be read or downloaded. Trafae
-counts anonymous clicks on these links to track how often readers open
-books.
+When a collection provides a direct reading or download link, the card
+shows **Read / download**. Otherwise, if a catalog URL is available, it
+shows **View source**. A card with no valid link says **No link available**.
+Some cards also offer **Another format**. These links open in a new tab.
+
+Trafae counts anonymous clicks on direct book links by source. Viewing a
+catalog record does not count as a reading click.
 
 ## Main features
 
 - **One search, many collections:** seven open book catalogs are searched
   in parallel with a single question.
-- **Free to read:** sources provide public-domain, open-access, or other
-  books available to read at no cost; access terms may vary.
+- **Direct links where available:** book cards link to reading or download
+  formats when a collection supplies them, and otherwise link to the source
+  catalog when possible. Access terms vary by collection.
 - **Merged, deduplicated results:** the same book from several catalogs
   collapses into one entry that keeps each source's ratings and popularity.
 - **Combined ranking:** each catalog's ordering contributes to one list;
